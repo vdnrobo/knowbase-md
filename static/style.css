@@ -212,14 +212,15 @@ h3 {
     color: var(--accent);
 }
 
-.category summary span {
+.category-title {
     margin-left: 6px;
 }
 
 .category-authors {
     display: inline-flex;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px;
     margin-left: 10px;
     color: var(--muted);
     font-size: 0.9rem;
@@ -227,8 +228,32 @@ h3 {
     line-height: 1.35;
 }
 
-.category-authors a {
+.category-author-label {
+    color: var(--muted);
+}
+
+.category-author-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--heading);
     font-weight: 800;
+}
+
+.category-author-link:hover {
+    color: var(--accent-dark);
+    text-decoration: none;
+}
+
+.category-author-photo {
+    display: block;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    object-fit: cover;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
 }
 
 .category summary + .category-description {

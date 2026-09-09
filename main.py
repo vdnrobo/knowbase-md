@@ -572,9 +572,19 @@ def render_category_authors(category):
         return ""
 
     label = "Авторы" if len(authors) > 1 else "Автор"
+    author_items = ""
+    for author in authors:
+        author_items += f"""
+            <a class="category-author-link" href="{author["url"]}">
+                {render_author_photo(author, "category-author-photo")}
+                <span>{html.escape(author["title"])}</span>
+            </a>
+        """
+
     return f"""
         <span class="category-authors">
-            {label}: {render_author_links(authors)}
+            <span class="category-author-label">{label}:</span>
+            {author_items}
         </span>
     """
 

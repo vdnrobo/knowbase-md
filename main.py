@@ -60,7 +60,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.1.0"
+SITE_VERSION = "1.2.0"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth, "
     "слои не расходятся и лежат ровно"
@@ -69,6 +69,7 @@ PROTECTED_MARKER = "<!-- protected -->"
 PASSWORD_ENV_PREFIX = "ARTICLE_PASSWORD_"
 AUTH_COOKIE_PREFIX = "article_auth_"
 MAX_FORM_BYTES = 4096
+AUTHORS_DIR = "./authors"
 MEDIA_EXTENSIONS = {
     ".avif",
     ".gif",
@@ -79,6 +80,7 @@ MEDIA_EXTENSIONS = {
     ".svg",
     ".webp",
 }
+AUTHOR_PHOTO_EXTENSIONS = {".avif", ".jpeg", ".jpg", ".png", ".svg", ".webp"}
 
 
 class FigureImageTreeprocessor(Treeprocessor):
@@ -285,13 +287,40 @@ def build_auth_token(category, password):
     return hmac.new(password.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
-def split_protected_marker(content):
+def parse_article_metadata(content):
     body = content.lstrip()
+    metadata = {
+        "protected": False,
+        "author_slugs": [],
+    }
 
-    if not body.startswith(PROTECTED_MARKER):
-        return False, content
+    while body.startswith("<!--"):
+        comment_end = body.find("-->")
+        if comment_end == -1:
+            break
 
-    return True, body[len(PROTECTED_MARKER):].lstrip()
+        comment = body[4:comment_end].strip()
+        lower_comment = comment.lower()
+
+        if lower_comment == "protected":
+            metadata["protected"] = True
+            body = body[comment_end + 3:].lstrip()
+            continue
+
+        authors_match = re.match(r"authors?\s*:\s*(.+)$", comment, re.IGNORECASE)
+        if authors_match:
+            author_slugs = [
+                author_slug.strip()
+                for author_slug in authors_match.group(1).split(",")
+                if author_slug.strip()
+            ]
+            metadata["author_slugs"].extend(author_slugs)
+            body = body[comment_end + 3:].lstrip()
+            continue
+
+        break
+
+    return metadata, body
 
 
 def strip_leading_html_comments(content):
@@ -313,6 +342,20 @@ def get_article_title(content, fallback):
             return match.group(1).strip()
 
     return fallback
+
+
+def split_markdown_title(content, fallback):
+    body = strip_leading_html_comments(content)
+    lines = body.splitlines()
+
+    for index, line in enumerate(lines):
+        match = re.match(r"^#\s+(.+?)\s*$", line)
+        if match:
+            title = match.group(1).strip()
+            description = "\n".join(lines[index + 1:]).strip()
+            return title, description
+
+    return fallback, body.strip()
 
 
 def count_toc_items(tokens):
@@ -390,9 +433,171 @@ def find_article_media(path):
     return None
 
 
+def find_author_photo_file(author_slug):
+    for extension in sorted(AUTHOR_PHOTO_EXTENSIONS):
+        file_path = safe_join(AUTHORS_DIR, author_slug, f"photo{extension}")
+        if file_path and os.path.isfile(file_path):
+            return file_path, extension
+
+    return None, ""
+
+
+def find_author_photo(path):
+    parts = [unquote(part) for part in path.strip("/").split("/") if part]
+    if len(parts) != 3 or parts[0] != "authors":
+        return None
+
+    filename = parts[2]
+    if not filename.startswith("photo."):
+        return None
+
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in AUTHOR_PHOTO_EXTENSIONS:
+        return None
+
+    file_path = safe_join(AUTHORS_DIR, parts[1], filename)
+    if file_path and os.path.isfile(file_path):
+        return file_path
+
+    return None
+
+
+def load_authors():
+    authors = {}
+    if not os.path.isdir(AUTHORS_DIR):
+        return authors
+
+    for author_slug in sorted(os.listdir(AUTHORS_DIR)):
+        author_dir = os.path.join(AUTHORS_DIR, author_slug)
+        if not os.path.isdir(author_dir):
+            continue
+
+        profile = read_text_file(os.path.join(author_dir, "profile.md"))
+        title, description = split_markdown_title(profile, author_slug)
+        description_html = ""
+        if description:
+            description_html = render_description_markdown(description)
+
+        photo_file, photo_extension = find_author_photo_file(author_slug)
+        photo_url = ""
+        if photo_file:
+            photo_url = f"/authors/{quote(author_slug)}/photo{photo_extension}"
+
+        authors[author_slug] = {
+            "slug": author_slug,
+            "title": title,
+            "description": description,
+            "description_html": description_html,
+            "photo_url": photo_url,
+            "url": f"/authors/{quote(author_slug)}",
+            "articles": [],
+        }
+
+    return authors
+
+
+def get_or_create_author(authors, author_slug):
+    if author_slug not in authors:
+        authors[author_slug] = {
+            "slug": author_slug,
+            "title": author_slug,
+            "description": "",
+            "description_html": "",
+            "photo_url": "",
+            "url": f"/authors/{quote(author_slug)}",
+            "articles": [],
+        }
+
+    return authors[author_slug]
+
+
+def sort_authors(authors):
+    return sorted(
+        authors.values(),
+        key=lambda author: (author["title"].casefold(), author["slug"].casefold()),
+    )
+
+
+def render_author_links(authors):
+    if not authors:
+        return ""
+
+    links = [
+        f'<a href="{author["url"]}">{html.escape(author["title"])}</a>'
+        for author in authors
+    ]
+    return ", ".join(links)
+
+
+def render_article_authors(article, class_name):
+    if not article["authors"]:
+        return ""
+
+    label = "Авторы" if len(article["authors"]) > 1 else "Автор"
+    return f"""
+        <p class="{class_name}">
+            <span>{label}:</span> {render_author_links(article["authors"])}
+        </p>
+    """
+
+
+def render_author_photo(author, class_name):
+    if author["photo_url"]:
+        return (
+            f'<img class="{class_name}" src="{author["photo_url"]}" '
+            f'alt="{html.escape(author["title"])}">'
+        )
+
+    initials = "".join(
+        part[0].upper()
+        for part in re.findall(r"[A-Za-zА-Яа-яЁё0-9]+", author["title"])[:2]
+    )
+    if not initials:
+        initials = "?"
+
+    return f'<div class="{class_name} author-photo-placeholder">{html.escape(initials)}</div>'
+
+
+def render_article_list_item(article, protected=False):
+    authors = render_article_authors(article, "article-item-authors")
+    badge = ""
+    protected_class = ""
+    if protected:
+        protected_class = " protected-article"
+        badge = '<span class="protected-badge">закрыто</span>'
+
+    return f"""
+        <li class="article-item{protected_class}" data-search="{html.escape(article["search_text"])}">
+            <a href="{article["url"]}">{html.escape(article["title"])}</a>
+            {badge}
+            {authors}
+        </li>
+    """
+
+
+def render_author_article_item(article):
+    badge = ""
+    protected_class = ""
+    if article["protected"]:
+        protected_class = " protected-article"
+        badge = '<span class="protected-badge">закрыто</span>'
+
+    category = article["category"]
+    search_text = f'{category["title"]} {article["title"]} {article["search_text"]}'
+
+    return f"""
+        <li class="article-item{protected_class}" data-search="{html.escape(search_text)}">
+            <a href="{article["url"]}">{html.escape(article["title"])}</a>
+            {badge}
+            <p class="article-item-authors">{html.escape(category["title"])}</p>
+        </li>
+    """
+
+
 def load_content():
     categories = []
     articles_by_url = {}
+    authors = load_authors()
 
     for category_slug in sorted(os.listdir(ARTICLES_DIR)):
         category_dir = os.path.join(ARTICLES_DIR, category_slug)
@@ -429,7 +634,14 @@ def load_content():
             with open(article_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            protected, content = split_protected_marker(content)
+            metadata, content = parse_article_metadata(content)
+            article_authors = [
+                get_or_create_author(authors, author_slug)
+                for author_slug in metadata["author_slugs"]
+            ]
+            author_search_text = " ".join(
+                author["title"] for author in article_authors
+            )
             content_html, toc_html = render_markdown(content)
             url = f"/{quote(category_slug)}/{quote(article_slug)}"
             article = {
@@ -437,20 +649,23 @@ def load_content():
                 "content": content_html,
                 "toc": toc_html,
                 "url": url,
-                "search_text": content,
-                "protected": protected,
+                "search_text": f"{content} {author_search_text}",
+                "protected": metadata["protected"],
                 "category": category,
                 "slug": article_slug,
+                "authors": article_authors,
             }
 
             category["articles"].append(article)
             articles_by_url[url] = article
+            for author in article_authors:
+                author["articles"].append(article)
 
         if category["articles"]:
             categories.append(category)
 
     categories.sort(key=lambda category: category["slug"].casefold())
-    return categories, articles_by_url
+    return categories, articles_by_url, authors
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -548,7 +763,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        categories, articles = load_content()
+        categories, articles, authors = load_content()
 
         if path not in articles or not articles[path]["protected"]:
             self.send_response(404)
@@ -620,7 +835,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_file(media_path)
             return
 
-        categories, articles = load_content()
+        author_photo_path = find_author_photo(path)
+        if author_photo_path:
+            self.send_file(author_photo_path)
+            return
+
+        categories, articles, authors = load_content()
 
         # --- MAIN PAGE ---
         if path == "/":
@@ -650,20 +870,14 @@ class Handler(BaseHTTPRequestHandler):
                         f'{category_search_text} {article["title"]} '
                         f'{article["search_text"]}'
                     )
-                    article_link = f"""
-                        <li class="article-item" data-search="{html.escape(article_search_text)}">
-                            <a href="{article["url"]}">{html.escape(article["title"])}</a>
-                        </li>
-                    """
+                    article["search_text"] = article_search_text
                     if article["protected"]:
-                        protected_links += f"""
-                            <li class="article-item protected-article" data-search="{html.escape(article_search_text)}">
-                                <a href="{article["url"]}">{html.escape(article["title"])}</a>
-                                <span class="protected-badge">закрыто</span>
-                            </li>
-                        """
+                        protected_links += render_article_list_item(
+                            article,
+                            protected=True,
+                        )
                     else:
-                        links += article_link
+                        links += render_article_list_item(article)
 
                 regular_list = ""
                 if links:
@@ -718,6 +932,9 @@ class Handler(BaseHTTPRequestHandler):
                             <h1>База знаний</h1>
                         </div>
                     </header>
+                    <nav class="site-top-nav" aria-label="Основные страницы">
+                        <a href="/authors">Авторы</a>
+                    </nav>
                     {announcement}
                     <div class="search-box">
                         <label for="site-search">Поиск</label>
@@ -731,6 +948,144 @@ class Handler(BaseHTTPRequestHandler):
             </html>
             """.encode("utf-8"))
 
+        # --- AUTHORS LIST ---
+        elif path == "/authors":
+            site_footer = render_site_footer()
+            author_cards = ""
+            for author in sort_authors(authors):
+                articles_count = len(author["articles"])
+                description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
+                author_cards += f"""
+                    <article class="author-card">
+                        <a class="author-card-photo-link" href="{author["url"]}">
+                            {render_author_photo(author, "author-card-photo")}
+                        </a>
+                        <div class="author-card-body">
+                            <h2><a href="{author["url"]}">{html.escape(author["title"])}</a></h2>
+                            <div class="author-description">{description}</div>
+                            <p class="author-article-count">Статей: {articles_count}</p>
+                        </div>
+                    </article>
+                """
+
+            if not author_cards:
+                author_cards = '<p class="no-results">Авторы пока не добавлены.</p>'
+
+            self.send_html(f"""
+            <!DOCTYPE html>
+            <html lang="ru">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>Авторы</title>
+                <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <link rel="stylesheet" href="/static/style.css">
+                <script src="/static/site.js" defer></script>
+            </head>
+            <body>
+                <div class="container">
+                    <a class="page-mark" href="/" aria-label="На главную">
+                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
+                        <span>VDN на Robo548</span>
+                    </a>
+                    <main>
+                        <h1>Авторы</h1>
+                        <div class="author-grid">
+                            {author_cards}
+                        </div>
+                    </main>
+                    {site_footer}
+                </div>
+            </body>
+            </html>
+            """)
+
+        # --- AUTHOR PAGE ---
+        elif path.startswith("/authors/"):
+            parts = [unquote(part) for part in path.strip("/").split("/") if part]
+            if len(parts) != 2 or parts[0] != "authors" or parts[1] not in authors:
+                site_footer = render_site_footer()
+                self.send_html(f"""
+                <!DOCTYPE html>
+                <html lang="ru">
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Автор не найден</title>
+                    <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                    <link rel="stylesheet" href="/static/style.css">
+                    <script src="/static/site.js" defer></script>
+                </head>
+                <body>
+                    <div class="container not-found">
+                        <a class="page-mark" href="/" aria-label="На главную">
+                            <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
+                            <span>VDN · Robo548</span>
+                        </a>
+                        <p class="not-found-code">404</p>
+                        <h1>Автор не найден</h1>
+                        <p class="not-found-text">Такой автор пока не добавлен.</p>
+                        <a class="primary-link" href="/authors">К списку авторов</a>
+                        {site_footer}
+                    </div>
+                </body>
+                </html>
+                """, status=404)
+            else:
+                author = authors[parts[1]]
+                site_footer = render_site_footer()
+                description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
+                article_items = "".join(
+                    render_author_article_item(article)
+                    for article in sorted(
+                        author["articles"],
+                        key=lambda item: (
+                            item["category"]["slug"].casefold(),
+                            item["slug"].casefold(),
+                        ),
+                    )
+                )
+                if not article_items:
+                    article_items = '<li class="article-item">Статьи пока не указаны.</li>'
+
+                self.send_html(f"""
+                <!DOCTYPE html>
+                <html lang="ru">
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>{html.escape(author["title"])}</title>
+                    <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                    <link rel="stylesheet" href="/static/style.css">
+                    <script src="/static/site.js" defer></script>
+                </head>
+                <body>
+                    <div class="container">
+                        <a class="page-mark" href="/authors" aria-label="К списку авторов">
+                            <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
+                            <span>Авторы</span>
+                        </a>
+                        <main>
+                            <section class="author-profile">
+                                {render_author_photo(author, "author-profile-photo")}
+                                <div class="author-profile-body">
+                                    <h1>{html.escape(author["title"])}</h1>
+                                    <div class="author-description">{description}</div>
+                                </div>
+                            </section>
+                            <section class="author-articles">
+                                <h2>Статьи автора</h2>
+                                <ul class="article-list">
+                                    {article_items}
+                                </ul>
+                            </section>
+                        </main>
+                        {site_footer}
+                    </div>
+                </body>
+                </html>
+                """)
+
         # --- ARTICLE PAGE ---
         elif path in articles:
             article = articles[path]
@@ -741,6 +1096,7 @@ class Handler(BaseHTTPRequestHandler):
             category = article["category"]
             site_footer = render_site_footer()
             article_index = category["articles"].index(article)
+            article_authors = render_article_authors(article, "article-page-authors")
             previous_article = (
                 category["articles"][article_index - 1] if article_index > 0 else None
             )
@@ -827,6 +1183,7 @@ class Handler(BaseHTTPRequestHandler):
                     <div class="article-layout">
                         {toc}
                         <main class="article-main">
+                            {article_authors}
                             <article class="article-body">
                                 {article["content"]}
                             </article>

@@ -429,6 +429,23 @@ h3 {
     margin-bottom: 12px;
 }
 
+.author-article-group {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.author-article-group h3 {
+    margin: 0 0 10px;
+    font-size: 1.08rem;
+}
+
+.author-article-group .article-list {
+    margin-bottom: 0;
+}
+
 .home-authors {
     margin-top: 34px;
     padding-top: 22px;

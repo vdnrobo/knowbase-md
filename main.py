@@ -1104,18 +1104,38 @@ class Handler(BaseHTTPRequestHandler):
                 author = authors[parts[1]]
                 site_footer = render_site_footer()
                 description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
-                article_items = "".join(
-                    render_author_article_item(article)
-                    for article in sorted(
-                        author["articles"],
-                        key=lambda item: (
-                            item["category"]["slug"].casefold(),
-                            item["slug"].casefold(),
-                        ),
+                articles_by_category = {}
+                for article in sorted(
+                    author["articles"],
+                    key=lambda item: (
+                        item["category"]["slug"].casefold(),
+                        item["slug"].casefold(),
+                    ),
+                ):
+                    category = article["category"]
+                    articles_by_category.setdefault(category["slug"], {
+                        "category": category,
+                        "articles": [],
+                    })["articles"].append(article)
+
+                article_groups = ""
+                for group in articles_by_category.values():
+                    category = group["category"]
+                    article_items = "".join(
+                        render_author_article_item(article)
+                        for article in group["articles"]
                     )
-                )
-                if not article_items:
-                    article_items = '<li class="article-item">Статьи пока не указаны.</li>'
+                    article_groups += f"""
+                        <section class="author-article-group">
+                            <h3>{html.escape(category["title"])}</h3>
+                            <ul class="article-list">
+                                {article_items}
+                            </ul>
+                        </section>
+                    """
+
+                if not article_groups:
+                    article_groups = '<p class="no-results">Статьи пока не указаны.</p>'
 
                 self.send_html(f"""
                 <!DOCTYPE html>
@@ -1144,9 +1164,7 @@ class Handler(BaseHTTPRequestHandler):
                             </section>
                             <section class="author-articles">
                                 <h2>Статьи автора</h2>
-                                <ul class="article-list">
-                                    {article_items}
-                                </ul>
+                                {article_groups}
                             </section>
                         </main>
                         {site_footer}

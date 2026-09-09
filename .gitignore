@@ -1,0 +1,8 @@
+.env
+.venv/
+.idea/
+.agents/
+.codex/
+__pycache__/
+*.pyc
+articles/

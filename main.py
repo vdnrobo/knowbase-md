@@ -60,7 +60,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.0.0"
+SITE_VERSION = "1.1.0"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth, "
     "слои не расходятся и лежат ровно"
@@ -516,6 +516,7 @@ class Handler(BaseHTTPRequestHandler):
                 <title>Доступ ограничен — {escaped_title}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
+                <script src="/static/site.js" defer></script>
             </head>
             <body>
                 <div class="container auth-container">
@@ -872,6 +873,7 @@ class Handler(BaseHTTPRequestHandler):
             <title>404 — Робот потерял страницу</title>
             <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
             <link rel="stylesheet" href="/static/style.css">
+            <script src="/static/site.js" defer></script>
         </head>
         <body>
 

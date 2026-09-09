@@ -19,6 +19,9 @@
     --code-bg: #2b241f;
     --code-text: #fff7ef;
     --danger: #9a3412;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 18px;
 }
 
 html {
@@ -32,6 +35,23 @@ body {
     color: var(--text);
     margin: 0;
     min-height: 100vh;
+    animation: pageFadeIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body.is-page-leaving {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@keyframes pageFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .article-page {
@@ -45,7 +65,7 @@ body {
     background: var(--surface);
     padding: 30px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 10px 26px var(--shadow);
 }
 
@@ -64,7 +84,7 @@ body {
 .site-brand-icon,
 .page-mark-icon {
     flex: 0 0 auto;
-    border-radius: 4px;
+    border-radius: var(--radius);
     box-shadow: 0 6px 14px var(--shadow);
 }
 
@@ -130,7 +150,7 @@ h3 {
     padding: 16px 18px;
     background: var(--surface-soft);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     box-shadow: none;
 }
 
@@ -158,7 +178,7 @@ h3 {
     padding: 12px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--text);
     font: inherit;
 }
@@ -177,7 +197,7 @@ h3 {
     padding: 18px 20px;
     background: var(--surface-muted);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     box-shadow: 0 6px 18px var(--shadow);
 }
 
@@ -231,7 +251,7 @@ h3 {
     padding: 8px 12px;
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--heading);
     cursor: pointer;
     font: inherit;
@@ -261,7 +281,7 @@ h3 {
     padding: 2px 7px;
     background: var(--accent-soft);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--accent-dark);
     font-size: 0.78rem;
     font-weight: 800;
@@ -306,7 +326,7 @@ li {
     padding: 16px 18px;
     background: var(--surface-soft);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
 }
 
 .toc-header {
@@ -328,7 +348,7 @@ li {
     padding: 6px 10px;
     background: var(--surface);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--heading);
     cursor: pointer;
     font: inherit;
@@ -374,7 +394,7 @@ li {
     padding: 0;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--heading);
     cursor: pointer;
     font: inherit;
@@ -437,7 +457,7 @@ li {
     height: auto;
     margin: 24px auto;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
 }
 
 .article-body figure img {
@@ -474,7 +494,7 @@ pre {
     background: var(--code-bg);
     color: var(--code-text);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius);
 }
 
 code {
@@ -485,7 +505,7 @@ code {
 :not(pre) > code {
     padding: 2px 5px;
     background: var(--accent-soft);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
 }
 
 .back {
@@ -521,7 +541,7 @@ code {
     padding: 8px 12px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--heading);
     font-weight: 700;
     line-height: 1.25;
@@ -558,7 +578,7 @@ code {
     padding: 22px;
     background: var(--surface-soft);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
 }
 
 .auth-kicker {
@@ -579,7 +599,7 @@ code {
     padding: 10px 12px;
     background: var(--accent-soft);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--danger);
     font-weight: 700;
 }
@@ -605,7 +625,7 @@ code {
     padding: 12px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--text);
     font: inherit;
 }
@@ -620,7 +640,7 @@ code {
     padding: 12px 16px;
     background: var(--accent);
     border: 1px solid var(--accent);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: #ffffff;
     cursor: pointer;
     font: inherit;
@@ -642,7 +662,7 @@ code {
     padding: 8px 16px;
     background: var(--accent-soft);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--heading);
     font-size: 2.4rem;
     font-weight: 800;
@@ -660,7 +680,7 @@ code {
     display: inline-block;
     padding: 12px 18px;
     background: var(--accent);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: #ffffff;
     font-weight: 700;
     box-shadow: 0 8px 18px var(--shadow);
@@ -722,7 +742,7 @@ code {
     .site-brand-icon {
         width: 40px;
         height: 40px;
-        border-radius: 4px;
+        border-radius: var(--radius);
     }
 
     .site-brand-kicker {
@@ -737,7 +757,7 @@ code {
     .page-mark-icon {
         width: 28px;
         height: 28px;
-        border-radius: 4px;
+        border-radius: var(--radius-sm);
     }
 
     .site-footer {
@@ -765,7 +785,7 @@ code {
     .article-body img {
         max-width: 100%;
         margin: 18px auto;
-        border-radius: 4px;
+        border-radius: var(--radius);
     }
 
     .article-body figcaption {
@@ -775,7 +795,7 @@ code {
     .category {
         margin-top: 16px;
         padding: 14px;
-        border-radius: 4px;
+        border-radius: var(--radius-lg);
     }
 
     .category summary {
@@ -792,7 +812,7 @@ code {
 
     .auth-card {
         padding: 16px;
-        border-radius: 4px;
+        border-radius: var(--radius-lg);
     }
 
     .auth-form-row {
@@ -805,7 +825,7 @@ code {
 
     .toc-panel {
         margin: -2px 0 18px;
-        border-radius: 4px;
+        border-radius: var(--radius-lg);
     }
 
     .toc {
@@ -822,7 +842,7 @@ code {
 
     pre {
         padding: 12px;
-        border-radius: 4px;
+        border-radius: var(--radius);
         font-size: 0.88rem;
     }
 
@@ -979,5 +999,25 @@ code {
 
     100% {
         transform: translate(-180px,-120px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    body {
+        animation: none;
+        transition: none;
+    }
+
+    body.is-page-leaving {
+        opacity: 1;
     }
 }

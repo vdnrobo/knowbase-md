@@ -216,6 +216,21 @@ h3 {
     margin-left: 6px;
 }
 
+.category-authors {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-left: 10px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.category-authors a {
+    font-weight: 800;
+}
+
 .category summary + .category-description {
     margin-top: 8px;
 }
@@ -969,6 +984,12 @@ code {
 
     .category summary {
         font-size: 1.12rem;
+    }
+
+    .category-authors {
+        display: flex;
+        margin: 6px 0 0 0;
+        font-size: 0.86rem;
     }
 
     .protected-toggle {

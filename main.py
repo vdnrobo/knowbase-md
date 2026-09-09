@@ -518,6 +518,19 @@ def sort_authors(authors):
     )
 
 
+def get_category_authors(category):
+    seen = set()
+    category_authors = []
+    for article in category["articles"]:
+        for author in article["authors"]:
+            if author["slug"] in seen:
+                continue
+            seen.add(author["slug"])
+            category_authors.append(author)
+
+    return sort_authors({author["slug"]: author for author in category_authors})
+
+
 def render_author_links(authors):
     if not authors:
         return ""
@@ -538,6 +551,19 @@ def render_article_authors(article, class_name):
         <p class="{class_name}">
             <span>{label}:</span> {render_author_links(article["authors"])}
         </p>
+    """
+
+
+def render_category_authors(category):
+    authors = get_category_authors(category)
+    if not authors:
+        return ""
+
+    label = "Авторы" if len(authors) > 1 else "Автор"
+    return f"""
+        <span class="category-authors">
+            {label}: {render_author_links(authors)}
+        </span>
     """
 
 
@@ -907,7 +933,8 @@ class Handler(BaseHTTPRequestHandler):
                 category_blocks += f"""
                     <details id="category-{html.escape(category["slug"])}" class="category" open data-search="{html.escape(category_search_text)}">
                         <summary>
-                            <span>{html.escape(category["title"])}</span>
+                            <span class="category-title">{html.escape(category["title"])}</span>
+                            {render_category_authors(category)}
                         </summary>
                         {description}
                         {regular_list}

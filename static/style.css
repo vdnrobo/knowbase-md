@@ -101,31 +101,6 @@ body.is-page-leaving {
     margin-bottom: 0;
 }
 
-.site-top-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin: 0 0 22px;
-}
-
-.site-top-nav a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 36px;
-    padding: 7px 12px;
-    background: var(--surface-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--heading);
-    font-weight: 800;
-}
-
-.site-top-nav a:hover {
-    background: var(--accent-soft);
-    color: var(--accent-dark);
-    text-decoration: none;
-}
-
 .page-mark {
     display: inline-flex;
     align-items: center;
@@ -377,6 +352,60 @@ h3 {
 
 .author-articles h2 {
     margin-bottom: 12px;
+}
+
+.home-authors {
+    margin-top: 34px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+}
+
+.home-authors h2 {
+    margin: 0 0 14px;
+    font-size: 1.25rem;
+}
+
+.home-author-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.home-author-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--heading);
+    font-weight: 800;
+}
+
+.home-author-link:hover {
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    text-decoration: none;
+}
+
+.home-author-link span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-author-photo {
+    display: block;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    object-fit: cover;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 50%;
 }
 
 .protected-articles {
@@ -879,15 +908,6 @@ code {
         margin-bottom: 14px;
     }
 
-    .site-top-nav {
-        margin-bottom: 18px;
-    }
-
-    .site-top-nav a {
-        width: 100%;
-        justify-content: center;
-    }
-
     .site-brand-icon {
         width: 40px;
         height: 40px;
@@ -973,6 +993,15 @@ code {
     .author-profile {
         gap: 16px;
         margin-bottom: 24px;
+    }
+
+    .home-authors {
+        margin-top: 26px;
+        padding-top: 18px;
+    }
+
+    .home-author-list {
+        grid-template-columns: 1fr;
     }
 
     .auth-card {

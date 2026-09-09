@@ -851,6 +851,7 @@ class Handler(BaseHTTPRequestHandler):
             announcement = load_announcement()
             site_footer = render_site_footer()
             category_blocks = ""
+            home_authors = ""
             for category in categories:
                 description = ""
                 if category["description"]:
@@ -912,6 +913,25 @@ class Handler(BaseHTTPRequestHandler):
                     </details>
                 """
 
+            home_author_items = ""
+            for author in sort_authors(authors):
+                home_author_items += f"""
+                    <a class="home-author-link" href="{author["url"]}">
+                        {render_author_photo(author, "home-author-photo")}
+                        <span>{html.escape(author["title"])}</span>
+                    </a>
+                """
+
+            if home_author_items:
+                home_authors = f"""
+                    <section class="home-authors" aria-labelledby="home-authors-title">
+                        <h2 id="home-authors-title">Авторы</h2>
+                        <div class="home-author-list">
+                            {home_author_items}
+                        </div>
+                    </section>
+                """
+
             self.wfile.write(f"""
             <!DOCTYPE html>
             <html lang="ru">
@@ -932,9 +952,6 @@ class Handler(BaseHTTPRequestHandler):
                             <h1>База знаний</h1>
                         </div>
                     </header>
-                    <nav class="site-top-nav" aria-label="Основные страницы">
-                        <a href="/authors">Авторы</a>
-                    </nav>
                     {announcement}
                     <div class="search-box">
                         <label for="site-search">Поиск</label>
@@ -942,6 +959,7 @@ class Handler(BaseHTTPRequestHandler):
                     </div>
                     <p id="no-results" class="no-results" hidden>Ничего не найдено.</p>
                     {category_blocks}
+                    {home_authors}
                     {site_footer}
                 </div>
             </body>

@@ -111,6 +111,15 @@ body {
     text-align: center;
 }
 
+.site-footer a {
+    color: var(--accent-dark);
+    font-weight: 700;
+}
+
+.site-footer a:hover {
+    color: var(--accent);
+}
+
 h1 {
     margin-top: 0;
     color: var(--heading);

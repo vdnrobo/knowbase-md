@@ -61,9 +61,9 @@ STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
 SITE_VERSION = "1.2.0"
+GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
 FOOTER_TEXT = (
-    f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth, "
-    "слои не расходятся и лежат ровно"
+    f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
 )
 PROTECTED_MARKER = "<!-- protected -->"
 PASSWORD_ENV_PREFIX = "ARTICLE_PASSWORD_"
@@ -259,7 +259,7 @@ def read_text_file(path, default=""):
 def render_site_footer():
     return f"""
         <footer class="site-footer">
-            {html.escape(FOOTER_TEXT)}
+            {html.escape(FOOTER_TEXT)} · <a href="{GITHUB_URL}" target="_blank" rel="noopener">GitHub</a>
         </footer>
     """
 

@@ -19,9 +19,9 @@
     --code-bg: #2b241f;
     --code-text: #fff7ef;
     --danger: #9a3412;
-    --radius-sm: 8px;
-    --radius: 12px;
-    --radius-lg: 18px;
+    --radius-sm: 10px;
+    --radius: 16px;
+    --radius-lg: 24px;
 }
 
 html {

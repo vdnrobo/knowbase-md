@@ -558,8 +558,10 @@ def render_author_photo(author, class_name):
     return f'<div class="{class_name} author-photo-placeholder">{html.escape(initials)}</div>'
 
 
-def render_article_list_item(article, protected=False):
-    authors = render_article_authors(article, "article-item-authors")
+def render_article_list_item(article, protected=False, show_authors=False):
+    authors = ""
+    if show_authors:
+        authors = render_article_authors(article, "article-item-authors")
     badge = ""
     protected_class = ""
     if protected:

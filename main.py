@@ -547,10 +547,22 @@ def render_article_authors(article, class_name):
         return ""
 
     label = "Авторы" if len(article["authors"]) > 1 else "Автор"
+    author_items = ""
+    for author in article["authors"]:
+        author_items += f"""
+            <a class="article-author-link" href="{author["url"]}">
+                {render_author_photo(author, "article-author-photo")}
+                <span>{html.escape(author["title"])}</span>
+            </a>
+        """
+
     return f"""
-        <p class="{class_name}">
-            <span>{label}:</span> {render_author_links(article["authors"])}
-        </p>
+        <div class="{class_name}">
+            <span class="article-author-label">{label}:</span>
+            <div class="article-author-list">
+                {author_items}
+            </div>
+        </div>
     """
 
 

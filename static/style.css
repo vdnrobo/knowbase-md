@@ -267,6 +267,10 @@ h3 {
 }
 
 .article-page-authors {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
     margin: 0 0 18px;
     padding: 10px 12px;
     background: var(--surface-soft);
@@ -276,9 +280,40 @@ h3 {
     line-height: 1.45;
 }
 
-.article-page-authors span {
+.article-author-label {
     color: var(--heading);
     font-weight: 800;
+}
+
+.article-author-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.article-author-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    color: var(--heading);
+    font-weight: 800;
+}
+
+.article-author-link:hover {
+    color: var(--accent-dark);
+    text-decoration: none;
+}
+
+.article-author-photo {
+    display: block;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
 }
 
 .author-grid {

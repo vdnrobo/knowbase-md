@@ -639,7 +639,6 @@ def render_author_article_item(article):
         <li class="article-item{protected_class}" data-search="{html.escape(search_text)}">
             <a href="{article["url"]}">{html.escape(article["title"])}</a>
             {badge}
-            <p class="article-item-authors">{html.escape(category["title"])}</p>
         </li>
     """
 

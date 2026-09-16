@@ -7,6 +7,7 @@ import io
 import mimetypes
 import os
 import re
+import traceback
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from xml.etree import ElementTree
 
@@ -598,6 +599,48 @@ def build_og_image(title, context="", author=None, description="", kind="vdn@rob
     draw.text((220, 103), "vdn@robo548", font=brand_font, fill=accent_dark)
     draw.text((220, 142), kind, font=small_font, fill=muted)
 
+    if author and include_author_description:
+        avatar_size = 230
+        avatar_x, avatar_y = 840, 190
+        avatar = get_author_photo_image(author, avatar_size)
+        if avatar:
+            paste_circle_image(image, avatar, (avatar_x, avatar_y), avatar_size)
+        else:
+            draw.ellipse((avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size), fill="#e5ebff")
+            initials = "".join(part[0] for part in author["title"].split()[:2]).upper()[:2]
+            initials_font = load_font(72, bold=True)
+            initials_w, initials_h = text_size(draw, initials, initials_font)
+            draw.text(
+                (avatar_x + (avatar_size - initials_w) / 2, avatar_y + (avatar_size - initials_h) / 2 - 8),
+                initials,
+                font=initials_font,
+                fill=accent_dark,
+            )
+        draw.ellipse(
+            (avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size),
+            outline=border,
+            width=5,
+        )
+
+        y = 225
+        y = draw_wrapped_text(draw, (108, y), title, title_font, text, 680, 2, line_gap=16)
+        if context:
+            y += 18
+            y = draw_wrapped_text(draw, (108, y), context, context_font, accent_dark, 680, 1, line_gap=10)
+
+        author_description = get_og_description(author.get("description", ""))
+        if author_description:
+            draw_wrapped_text(draw, (108, y + 20), author_description, description_font, muted, 680, 4, line_gap=10)
+
+        footer_text = "vdn.robo548.ru"
+        footer_font = load_font(22)
+        footer_width, _ = text_size(draw, footer_text, footer_font)
+        draw.text((width - 108 - footer_width, 524), footer_text, font=footer_font, fill=muted)
+
+        output = io.BytesIO()
+        image.convert("RGB").save(output, format="PNG", optimize=True)
+        return output.getvalue()
+
     y = 220
     y = draw_wrapped_text(draw, (108, y), title, title_font, text, 860, 3, line_gap=16)
 
@@ -992,54 +1035,64 @@ class Handler(BaseHTTPRequestHandler):
         with open(file_path, "rb") as f:
             self.wfile.write(f.read())
 
-    def send_png(self, content):
+    def send_png(self, content, send_body=True):
         self.send_response(200)
         self.send_header("Content-type", "image/png")
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
-        self.wfile.write(content)
+        if send_body:
+            self.wfile.write(content)
 
-    def send_og_image(self, path, articles, authors):
+    def send_og_image(self, path, articles, authors, send_body=True):
         parts = [unquote(part) for part in path.strip("/").split("/") if part]
 
-        if parts == ["og", "home.png"]:
-            self.send_png(build_og_image(
-                "База знаний",
-                context="Markdown-статьи VDN на Robo548",
-                description="Учебные материалы, инструкции и заметки в одном месте.",
-                kind="Главная страница",
-            ))
-            return True
+        try:
+            if parts == ["og", "home.png"]:
+                image = build_og_image(
+                    "База знаний",
+                    context="Markdown-статьи VDN на Robo548",
+                    description="Учебные материалы, инструкции и заметки в одном месте.",
+                    kind="Главная страница",
+                )
+                self.send_png(image, send_body=send_body)
+                return True
 
-        if len(parts) == 4 and parts[0] == "og" and parts[1] == "articles":
-            article_slug = os.path.splitext(parts[3])[0]
-            article_url = f"/{quote(parts[2])}/{quote(article_slug)}"
-            article = articles.get(article_url)
-            if not article:
-                return False
+            if len(parts) == 4 and parts[0] == "og" and parts[1] == "articles":
+                article_slug = os.path.splitext(parts[3])[0]
+                article_url = f"/{quote(parts[2])}/{quote(article_slug)}"
+                article = articles.get(article_url)
+                if not article:
+                    return False
 
-            first_author = article["authors"][0] if article["authors"] else None
-            self.send_png(build_og_image(
-                article["title"],
-                context=article["category"]["title"],
-                author=first_author,
-                kind="Статья",
-            ))
-            return True
+                first_author = article["authors"][0] if article["authors"] else None
+                image = build_og_image(
+                    article["title"],
+                    context=article["category"]["title"],
+                    author=first_author,
+                    kind="Статья",
+                )
+                self.send_png(image, send_body=send_body)
+                return True
 
-        if len(parts) == 3 and parts[0] == "og" and parts[1] == "authors":
-            author_slug = os.path.splitext(parts[2])[0]
-            author = authors.get(author_slug)
-            if not author:
-                return False
+            if len(parts) == 3 and parts[0] == "og" and parts[1] == "authors":
+                author_slug = os.path.splitext(parts[2])[0]
+                author = authors.get(author_slug)
+                if not author:
+                    return False
 
-            self.send_png(build_og_image(
-                author["title"],
-                context="Автор материалов",
-                author=author,
-                kind="Автор",
-                include_author_description=True,
-            ))
+                image = build_og_image(
+                    author["title"],
+                    context="Автор материалов",
+                    author=author,
+                    kind="Автор",
+                    include_author_description=True,
+                )
+                self.send_png(image, send_body=send_body)
+                return True
+        except Exception:
+            traceback.print_exc()
+            self.send_response(500)
+            self.end_headers()
             return True
 
         return False
@@ -1205,6 +1258,16 @@ class Handler(BaseHTTPRequestHandler):
             error = "Доступ к этому разделу пока не настроен."
 
         self.render_password_page(article, status=403, error=error)
+
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+        categories, articles, authors = load_content()
+
+        if path.startswith("/og/") and self.send_og_image(path, articles, authors, send_body=False):
+            return
+
+        self.send_response(404)
+        self.end_headers()
 
     def do_GET(self):
         path = urlparse(self.path).path

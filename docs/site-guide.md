@@ -283,8 +283,6 @@ ARTICLE_PASSWORD_10_3D=your-password
 
 Основной внешний вид находится в `static/style.css`. Поведение поиска, оглавления и раскрытия защищённых статей находится в `static/site.js`.
 
-Open Graph-картинки для Telegram генерируются сервером на маршрутах `/og/home.png`, `/og/articles/<category>/<slug>.png` и `/og/authors/<slug>.png`. Для корректных абсолютных ссылок на сервере задайте `PUBLIC_BASE_URL`, например `https://vdn.robo548.ru`.
-
 Основные скругления интерфейса задаются CSS-переменными `--radius-sm`, `--radius` и `--radius-lg` в начале `static/style.css`.
 
 ## 12. Локальный запуск

@@ -1,1 +1,2 @@
 Markdown==3.8.2
+Pillow==10.4.0

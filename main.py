@@ -3,6 +3,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hashlib
 import html
 import hmac
+import io
 import mimetypes
 import os
 import re
@@ -14,6 +15,7 @@ from markdown.extensions import Extension
 from markdown.postprocessors import Postprocessor
 from markdown.preprocessors import Preprocessor
 from markdown.treeprocessors import Treeprocessor
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 ENV_FILE = ".env"
 
@@ -55,6 +57,7 @@ load_env_file(ENV_FILE)
 
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "80"))
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
 ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
@@ -391,6 +394,259 @@ def render_description_markdown(content):
 
     content_html = re.sub(r"(?<![\"'=])(https?://[^\s<)]+)", replace_url, content_html)
     return content_html
+
+
+def strip_markdown_text(content):
+    text = strip_leading_html_comments(content or "")
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"[*_~>#-]+", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def truncate_text(text, limit):
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if len(text) <= limit:
+        return text
+
+    return text[:max(0, limit - 1)].rstrip() + "…"
+
+
+def get_og_description(description):
+    return truncate_text(strip_markdown_text(description), 180)
+
+
+def get_public_origin(handler):
+    if PUBLIC_BASE_URL:
+        return PUBLIC_BASE_URL
+
+    host = handler.headers.get("Host") or f"{HOST}:{PORT}"
+    if host.startswith("0.0.0.0"):
+        host = f"localhost:{PORT}"
+
+    proto = handler.headers.get("X-Forwarded-Proto") or "http"
+    return f"{proto}://{host}".rstrip("/")
+
+
+def absolute_url(handler, path):
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{get_public_origin(handler)}{path}"
+
+
+def render_og_tags(title, description, page_url, image_url, og_type="website"):
+    title = html.escape(title or "vdn@robo548", quote=True)
+    description = html.escape(description or "База знаний VDN на Robo548", quote=True)
+    page_url = html.escape(page_url, quote=True)
+    image_url = html.escape(image_url, quote=True)
+
+    return f"""
+                <meta property="og:type" content="{html.escape(og_type, quote=True)}">
+                <meta property="og:title" content="{title}">
+                <meta property="og:description" content="{description}">
+                <meta property="og:url" content="{page_url}">
+                <meta property="og:image" content="{image_url}">
+                <meta property="og:image:width" content="1200">
+                <meta property="og:image:height" content="630">
+                <meta name="twitter:card" content="summary_large_image">
+                <meta name="twitter:title" content="{title}">
+                <meta name="twitter:description" content="{description}">
+                <meta name="twitter:image" content="{image_url}">
+    """
+
+
+def load_font(size, bold=False):
+    candidates = []
+    if bold:
+        candidates.extend([
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/segoeuib.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ])
+    candidates.extend([
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    ])
+
+    for path in candidates:
+        if os.path.isfile(path):
+            return ImageFont.truetype(path, size)
+
+    return ImageFont.load_default()
+
+
+def text_size(draw, text, font):
+    box = draw.textbbox((0, 0), text, font=font)
+    return box[2] - box[0], box[3] - box[1]
+
+
+def wrap_text(draw, text, font, max_width, max_lines):
+    words = re.sub(r"\s+", " ", text or "").strip().split()
+    lines = []
+    current = ""
+
+    for word in words:
+        probe = word if not current else f"{current} {word}"
+        if text_size(draw, probe, font)[0] <= max_width:
+            current = probe
+            continue
+
+        if current:
+            lines.append(current)
+        current = word
+
+        while text_size(draw, current, font)[0] > max_width and len(current) > 1:
+            split_at = max(1, len(current) - 1)
+            while split_at > 1 and text_size(draw, current[:split_at] + "…", font)[0] > max_width:
+                split_at -= 1
+            lines.append(current[:split_at] + "…")
+            current = current[split_at:]
+
+        if len(lines) >= max_lines:
+            break
+
+    if current and len(lines) < max_lines:
+        lines.append(current)
+
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+
+    if lines and words and " ".join(lines).strip() != " ".join(words).strip():
+        while lines[-1] and text_size(draw, lines[-1] + "…", font)[0] > max_width:
+            lines[-1] = lines[-1][:-1].rstrip()
+        if not lines[-1].endswith("…"):
+            lines[-1] += "…"
+
+    return lines
+
+
+def draw_wrapped_text(draw, xy, text, font, fill, max_width, max_lines, line_gap=12):
+    x, y = xy
+    for line in wrap_text(draw, text, font, max_width, max_lines):
+        draw.text((x, y), line, font=font, fill=fill)
+        y += text_size(draw, line, font)[1] + line_gap
+    return y
+
+
+def load_raster_image(path, size=None, crop=False):
+    try:
+        image = Image.open(path).convert("RGBA")
+    except Exception:
+        return None
+
+    if size:
+        if crop:
+            image = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS)
+        else:
+            image.thumbnail(size, Image.Resampling.LANCZOS)
+
+    return image
+
+
+def paste_circle_image(base, image, xy, size):
+    if not image:
+        return
+
+    image = ImageOps.fit(image, (size, size), method=Image.Resampling.LANCZOS)
+    mask = Image.new("L", (size, size), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.ellipse((0, 0, size, size), fill=255)
+    base.paste(image, xy, mask)
+
+
+def get_author_photo_image(author, size):
+    photo_file, _ = find_author_photo_file(author["slug"])
+    if not photo_file:
+        return None
+
+    return load_raster_image(photo_file, (size, size), crop=True)
+
+
+def build_og_image(title, context="", author=None, description="", kind="vdn@robo548", include_author_description=False):
+    width, height = 1200, 630
+    page_bg = "#f5f7ff"
+    surface = "#ffffff"
+    accent = "#5070d0"
+    accent_dark = "#000070"
+    text = "#25293a"
+    muted = "#626a86"
+    border = "#ccd8ff"
+
+    image = Image.new("RGBA", (width, height), page_bg)
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((54, 54, width - 54, height - 54), radius=36, fill=surface, outline=border, width=3)
+    draw.rectangle((54, 54, 92, height - 54), fill=accent)
+
+    logo = load_raster_image(FAVICON_FILE, (92, 92), crop=True)
+    if logo:
+        image.alpha_composite(logo, (108, 94))
+
+    brand_font = load_font(28, bold=True)
+    small_font = load_font(30)
+    title_font = load_font(58, bold=True)
+    context_font = load_font(31, bold=True)
+    description_font = load_font(28)
+
+    draw.text((220, 103), "vdn@robo548", font=brand_font, fill=accent_dark)
+    draw.text((220, 142), kind, font=small_font, fill=muted)
+
+    y = 220
+    y = draw_wrapped_text(draw, (108, y), title, title_font, text, 860, 3, line_gap=16)
+
+    if context:
+        y = max(y + 16, 392)
+        y = draw_wrapped_text(draw, (108, y), context, context_font, accent_dark, 850, 2, line_gap=10)
+
+    if description and not author:
+        draw_wrapped_text(draw, (108, 430), description, description_font, muted, 850, 3, line_gap=10)
+
+    if author:
+        avatar_size = 118
+        avatar = get_author_photo_image(author, avatar_size)
+        avatar_x, avatar_y = 108, 466
+        if avatar:
+            paste_circle_image(image, avatar, (avatar_x, avatar_y), avatar_size)
+            draw.ellipse(
+                (avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size),
+                outline=border,
+                width=4,
+            )
+            name_x = avatar_x + avatar_size + 28
+        else:
+            draw.ellipse((avatar_x, avatar_y, avatar_x + avatar_size, avatar_y + avatar_size), fill="#e5ebff", outline=border, width=4)
+            initials = "".join(part[0] for part in author["title"].split()[:2]).upper()[:2]
+            initials_font = load_font(42, bold=True)
+            initials_w, initials_h = text_size(draw, initials, initials_font)
+            draw.text(
+                (avatar_x + (avatar_size - initials_w) / 2, avatar_y + (avatar_size - initials_h) / 2 - 4),
+                initials,
+                font=initials_font,
+                fill=accent_dark,
+            )
+            name_x = avatar_x + avatar_size + 28
+
+        draw.text((name_x, avatar_y + 18), author["title"], font=context_font, fill=text)
+        if include_author_description:
+            author_description = get_og_description(author.get("description", ""))
+            if author_description:
+                draw_wrapped_text(draw, (name_x, avatar_y + 60), author_description, description_font, muted, 690, 2, line_gap=8)
+
+    footer_text = "vdn.robo548.ru"
+    footer_font = load_font(22)
+    footer_width, _ = text_size(draw, footer_text, footer_font)
+    draw.text((width - 108 - footer_width, 524), footer_text, font=footer_font, fill=muted)
+
+    output = io.BytesIO()
+    image.convert("RGB").save(output, format="PNG", optimize=True)
+    return output.getvalue()
 
 
 def load_announcement():
@@ -736,6 +992,94 @@ class Handler(BaseHTTPRequestHandler):
         with open(file_path, "rb") as f:
             self.wfile.write(f.read())
 
+    def send_png(self, content):
+        self.send_response(200)
+        self.send_header("Content-type", "image/png")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def send_og_image(self, path, articles, authors):
+        parts = [unquote(part) for part in path.strip("/").split("/") if part]
+
+        if parts == ["og", "home.png"]:
+            self.send_png(build_og_image(
+                "База знаний",
+                context="Markdown-статьи VDN на Robo548",
+                description="Учебные материалы, инструкции и заметки в одном месте.",
+                kind="Главная страница",
+            ))
+            return True
+
+        if len(parts) == 4 and parts[0] == "og" and parts[1] == "articles":
+            article_slug = os.path.splitext(parts[3])[0]
+            article_url = f"/{quote(parts[2])}/{quote(article_slug)}"
+            article = articles.get(article_url)
+            if not article:
+                return False
+
+            first_author = article["authors"][0] if article["authors"] else None
+            self.send_png(build_og_image(
+                article["title"],
+                context=article["category"]["title"],
+                author=first_author,
+                kind="Статья",
+            ))
+            return True
+
+        if len(parts) == 3 and parts[0] == "og" and parts[1] == "authors":
+            author_slug = os.path.splitext(parts[2])[0]
+            author = authors.get(author_slug)
+            if not author:
+                return False
+
+            self.send_png(build_og_image(
+                author["title"],
+                context="Автор материалов",
+                author=author,
+                kind="Автор",
+                include_author_description=True,
+            ))
+            return True
+
+        return False
+
+    def build_page_og_tags(self, title, description, page_path, image_path, og_type="website"):
+        return render_og_tags(
+            title,
+            description,
+            absolute_url(self, page_path),
+            absolute_url(self, image_path),
+            og_type=og_type,
+        )
+
+    def build_article_og_tags(self, article):
+        first_author = article["authors"][0] if article["authors"] else None
+        description = article["category"]["title"]
+        if first_author:
+            description = f'{description} · {first_author["title"]}'
+
+        image_path = (
+            f'/og/articles/{quote(article["category"]["slug"])}'
+            f'/{quote(article["slug"])}.png'
+        )
+        return self.build_page_og_tags(
+            article["title"],
+            description,
+            article["url"],
+            image_path,
+            og_type="article",
+        )
+
+    def build_author_og_tags(self, author):
+        description = get_og_description(author["description"]) or "Автор материалов VDN на Robo548"
+        return self.build_page_og_tags(
+            author["title"],
+            description,
+            author["url"],
+            f'/og/authors/{quote(author["slug"])}.png',
+        )
+
     def has_article_access(self, article):
         if not article["protected"]:
             return True
@@ -766,6 +1110,7 @@ class Handler(BaseHTTPRequestHandler):
         escaped_title = html.escape(article["title"])
         escaped_category = html.escape(category["title"])
         action = html.escape(article["url"])
+        og_tags = self.build_article_og_tags(article)
 
         error_html = ""
         if error:
@@ -778,6 +1123,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Доступ ограничен — {escaped_title}</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -891,6 +1237,13 @@ class Handler(BaseHTTPRequestHandler):
 
         categories, articles, authors = load_content()
 
+        if path.startswith("/og/"):
+            if self.send_og_image(path, articles, authors):
+                return
+            self.send_response(404)
+            self.end_headers()
+            return
+
         # --- MAIN PAGE ---
         if path == "/":
             self.send_response(200)
@@ -899,6 +1252,12 @@ class Handler(BaseHTTPRequestHandler):
 
             announcement = load_announcement()
             site_footer = render_site_footer()
+            og_tags = self.build_page_og_tags(
+                "vdn@robo548",
+                "База знаний VDN на Robo548",
+                "/",
+                "/og/home.png",
+            )
             category_blocks = ""
             home_authors = ""
             for category in categories:
@@ -989,6 +1348,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>vdn@robo548</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -1019,6 +1379,12 @@ class Handler(BaseHTTPRequestHandler):
         # --- AUTHORS LIST ---
         elif path == "/authors":
             site_footer = render_site_footer()
+            og_tags = self.build_page_og_tags(
+                "Авторы",
+                "Авторы материалов VDN на Robo548",
+                "/authors",
+                "/og/home.png",
+            )
             author_cards = ""
             for author in sort_authors(authors):
                 articles_count = len(author["articles"])
@@ -1046,6 +1412,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Авторы</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -1102,6 +1469,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 author = authors[parts[1]]
                 site_footer = render_site_footer()
+                og_tags = self.build_author_og_tags(author)
                 description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
                 articles_by_category = {}
                 for article in sorted(
@@ -1143,6 +1511,7 @@ class Handler(BaseHTTPRequestHandler):
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>{html.escape(author["title"])}</title>
+                    {og_tags}
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
@@ -1181,6 +1550,7 @@ class Handler(BaseHTTPRequestHandler):
 
             category = article["category"]
             site_footer = render_site_footer()
+            og_tags = self.build_article_og_tags(article)
             article_index = category["articles"].index(article)
             article_authors = render_article_authors(article, "article-page-authors")
             previous_article = (
@@ -1241,6 +1611,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(article["title"])}</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
                 <link rel="stylesheet" href="/static/style.css">

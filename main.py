@@ -62,6 +62,7 @@ ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
 SITE_VERSION = "1.2.0"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
+OG_PREVIEW_PATH = "/static/preview.png"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
 )
@@ -261,6 +262,65 @@ def render_site_footer():
         <footer class="site-footer">
             {html.escape(FOOTER_TEXT)} · <a href="{GITHUB_URL}" target="_blank" rel="noopener">GitHub</a>
         </footer>
+    """
+
+
+def text_preview(content, limit=180):
+    text = strip_leading_html_comments(content or "")
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"[*_~>#-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    if len(text) <= limit:
+        return text
+
+    return text[:max(0, limit - 1)].rstrip() + "…"
+
+
+def get_request_origin(handler):
+    host = (
+        handler.headers.get("X-Forwarded-Host")
+        or handler.headers.get("Host")
+        or f"localhost:{PORT}"
+    )
+    proto = handler.headers.get("X-Forwarded-Proto")
+    if not proto:
+        proto = "http" if host.startswith(("localhost", "127.0.0.1")) else "https"
+    return f"{proto}://{host}".rstrip("/")
+
+
+def absolute_request_url(handler, path):
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{get_request_origin(handler)}{path}"
+
+
+def render_open_graph_tags(handler, title, description, page_path, og_type="website"):
+    title = html.escape(title or "vdn@robo548", quote=True)
+    description = html.escape(description or "База знаний VDN на Robo548", quote=True)
+    page_url = html.escape(absolute_request_url(handler, page_path), quote=True)
+    image_url = html.escape(absolute_request_url(handler, OG_PREVIEW_PATH), quote=True)
+    og_type = html.escape(og_type, quote=True)
+
+    return f"""
+                <meta property="og:type" content="{og_type}">
+                <meta property="og:title" content="{title}">
+                <meta property="og:description" content="{description}">
+                <meta property="og:url" content="{page_url}">
+                <meta property="og:image" content="{image_url}">
+                <meta property="og:image:width" content="1200">
+                <meta property="og:image:height" content="630">
+                <meta name="twitter:card" content="summary_large_image">
+                <meta name="twitter:title" content="{title}">
+                <meta name="twitter:description" content="{description}">
+                <meta name="twitter:image" content="{image_url}">
     """
 
 
@@ -726,15 +786,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(content.encode("utf-8"))
 
-    def send_file(self, file_path, content_type=None):
+    def send_file(self, file_path, content_type=None, send_body=True):
         guessed_type = mimetypes.guess_type(file_path)[0]
 
         self.send_response(200)
         self.send_header("Content-type", content_type or guessed_type or "application/octet-stream")
+        self.send_header("Content-Length", str(os.path.getsize(file_path)))
         self.end_headers()
 
-        with open(file_path, "rb") as f:
-            self.wfile.write(f.read())
+        if send_body:
+            with open(file_path, "rb") as f:
+                self.wfile.write(f.read())
 
     def has_article_access(self, article):
         if not article["protected"]:
@@ -766,6 +828,13 @@ class Handler(BaseHTTPRequestHandler):
         escaped_title = html.escape(article["title"])
         escaped_category = html.escape(category["title"])
         action = html.escape(article["url"])
+        og_tags = render_open_graph_tags(
+            self,
+            article["title"],
+            f'Закрытая статья раздела «{category["title"]}»',
+            article["url"],
+            og_type="article",
+        )
 
         error_html = ""
         if error:
@@ -778,6 +847,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Доступ ограничен — {escaped_title}</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -860,6 +930,35 @@ class Handler(BaseHTTPRequestHandler):
 
         self.render_password_page(article, status=403, error=error)
 
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+
+        if path == "/favicon.ico" and os.path.isfile(FAVICON_FILE):
+            self.send_file(FAVICON_FILE, "image/x-icon", send_body=False)
+            return
+
+        if path.startswith("/static/"):
+            file_path = safe_join(STATIC_DIR, unquote(path[len("/static/"):]))
+            if file_path and os.path.isfile(file_path):
+                self.send_file(file_path, send_body=False)
+            else:
+                self.send_response(404)
+                self.end_headers()
+            return
+
+        media_path = find_article_media(path)
+        if media_path:
+            self.send_file(media_path, send_body=False)
+            return
+
+        author_photo_path = find_author_photo(path)
+        if author_photo_path:
+            self.send_file(author_photo_path, send_body=False)
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
         path = urlparse(self.path).path
 
@@ -899,6 +998,12 @@ class Handler(BaseHTTPRequestHandler):
 
             announcement = load_announcement()
             site_footer = render_site_footer()
+            og_tags = render_open_graph_tags(
+                self,
+                "vdn@robo548",
+                "База знаний VDN на Robo548",
+                "/",
+            )
             category_blocks = ""
             home_authors = ""
             for category in categories:
@@ -989,6 +1094,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>vdn@robo548</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -1019,6 +1125,12 @@ class Handler(BaseHTTPRequestHandler):
         # --- AUTHORS LIST ---
         elif path == "/authors":
             site_footer = render_site_footer()
+            og_tags = render_open_graph_tags(
+                self,
+                "Авторы",
+                "Авторы материалов VDN на Robo548",
+                "/authors",
+            )
             author_cards = ""
             for author in sort_authors(authors):
                 articles_count = len(author["articles"])
@@ -1046,6 +1158,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Авторы</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
@@ -1073,6 +1186,12 @@ class Handler(BaseHTTPRequestHandler):
             parts = [unquote(part) for part in path.strip("/").split("/") if part]
             if len(parts) != 2 or parts[0] != "authors" or parts[1] not in authors:
                 site_footer = render_site_footer()
+                og_tags = render_open_graph_tags(
+                    self,
+                    "Автор не найден",
+                    "Такой автор пока не добавлен.",
+                    path,
+                )
                 self.send_html(f"""
                 <!DOCTYPE html>
                 <html lang="ru">
@@ -1080,6 +1199,7 @@ class Handler(BaseHTTPRequestHandler):
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Автор не найден</title>
+                    {og_tags}
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
@@ -1102,6 +1222,12 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 author = authors[parts[1]]
                 site_footer = render_site_footer()
+                og_tags = render_open_graph_tags(
+                    self,
+                    author["title"],
+                    text_preview(author["description"]) or "Автор материалов VDN на Robo548",
+                    author["url"],
+                )
                 description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
                 articles_by_category = {}
                 for article in sorted(
@@ -1143,6 +1269,7 @@ class Handler(BaseHTTPRequestHandler):
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>{html.escape(author["title"])}</title>
+                    {og_tags}
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
@@ -1181,6 +1308,16 @@ class Handler(BaseHTTPRequestHandler):
 
             category = article["category"]
             site_footer = render_site_footer()
+            article_description = category["title"]
+            if article["authors"]:
+                article_description = f'{article_description} · {article["authors"][0]["title"]}'
+            og_tags = render_open_graph_tags(
+                self,
+                article["title"],
+                article_description,
+                article["url"],
+                og_type="article",
+            )
             article_index = category["articles"].index(article)
             article_authors = render_article_authors(article, "article-page-authors")
             previous_article = (
@@ -1241,6 +1378,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(article["title"])}</title>
+                {og_tags}
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
                 <link rel="stylesheet" href="/static/style.css">
@@ -1285,6 +1423,12 @@ class Handler(BaseHTTPRequestHandler):
         # --- 404 ---
         else:
             site_footer = render_site_footer()
+            og_tags = render_open_graph_tags(
+                self,
+                "404 — страница не найдена",
+                "Запрошенная страница не найдена.",
+                path,
+            )
             category_links = ""
             for category in categories:
                 category_links += (
@@ -1314,6 +1458,7 @@ class Handler(BaseHTTPRequestHandler):
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>404 — Робот потерял страницу</title>
+            {og_tags}
             <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
             <link rel="stylesheet" href="/static/style.css">
             <script src="/static/site.js" defer></script>

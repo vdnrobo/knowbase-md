@@ -60,7 +60,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.3.1"
+SITE_VERSION = "1.3.0"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
 OG_PREVIEW_PATH = "/static/preview.png"
 FOOTER_TEXT = (
@@ -306,10 +306,7 @@ def render_open_graph_tags(handler, title, description, page_path, og_type="webs
     title = html.escape(title or "vdn@robo548", quote=True)
     description = html.escape(description or "База знаний VDN на Robo548", quote=True)
     page_url = html.escape(absolute_request_url(handler, page_path), quote=True)
-    image_url = html.escape(
-        absolute_request_url(handler, f"{OG_PREVIEW_PATH}?v={SITE_VERSION}"),
-        quote=True,
-    )
+    image_url = html.escape(absolute_request_url(handler, OG_PREVIEW_PATH), quote=True)
     og_type = html.escape(og_type, quote=True)
 
     return f"""
@@ -318,7 +315,6 @@ def render_open_graph_tags(handler, title, description, page_path, og_type="webs
                 <meta property="og:description" content="{description}">
                 <meta property="og:url" content="{page_url}">
                 <meta property="og:image" content="{image_url}">
-                <meta property="og:image:secure_url" content="{image_url}">
                 <meta property="og:image:width" content="1200">
                 <meta property="og:image:height" content="630">
                 <meta name="twitter:card" content="summary_large_image">

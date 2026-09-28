@@ -60,9 +60,9 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.3.2"
+SITE_VERSION = "1.3.1"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
-OG_PREVIEW_PATH = "/static/preview-1.3.2.png"
+OG_PREVIEW_PATH = "/static/preview.png"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
 )
@@ -306,7 +306,10 @@ def render_open_graph_tags(handler, title, description, page_path, og_type="webs
     title = html.escape(title or "vdn@robo548", quote=True)
     description = html.escape(description or "База знаний VDN на Robo548", quote=True)
     page_url = html.escape(absolute_request_url(handler, page_path), quote=True)
-    image_url = html.escape(absolute_request_url(handler, OG_PREVIEW_PATH), quote=True)
+    image_url = html.escape(
+        absolute_request_url(handler, f"{OG_PREVIEW_PATH}?v={SITE_VERSION}"),
+        quote=True,
+    )
     og_type = html.escape(og_type, quote=True)
 
     return f"""

@@ -60,9 +60,9 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.3.3"
+SITE_VERSION = "1.3.2"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
-OG_PREVIEW_PATH = "/static/og-preview-v133.png"
+OG_PREVIEW_PATH = "/static/preview-1.3.2.png"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
 )
@@ -310,16 +310,12 @@ def render_open_graph_tags(handler, title, description, page_path, og_type="webs
     og_type = html.escape(og_type, quote=True)
 
     return f"""
-                <meta name="description" content="{description}">
                 <meta property="og:type" content="{og_type}">
-                <meta property="og:site_name" content="VDN на Robo548">
-                <meta property="og:locale" content="ru_RU">
                 <meta property="og:title" content="{title}">
                 <meta property="og:description" content="{description}">
                 <meta property="og:url" content="{page_url}">
                 <meta property="og:image" content="{image_url}">
                 <meta property="og:image:secure_url" content="{image_url}">
-                <meta property="og:image:type" content="image/png">
                 <meta property="og:image:width" content="1200">
                 <meta property="og:image:height" content="630">
                 <meta name="twitter:card" content="summary_large_image">

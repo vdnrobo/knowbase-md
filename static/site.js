@@ -121,13 +121,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            const matchingProtectedArticle = articles.some((article) => {
-                return article.classList.contains("protected-article") && !article.hidden;
-            });
-            const protectedBlock = category.querySelector("[data-protected-articles]");
-            if (query && matchingProtectedArticle && protectedBlock) {
-                setProtectedExpanded(protectedBlock, true);
+            if (query) {
+                category.querySelectorAll("[data-protected-articles]").forEach((protectedBlock) => {
+                    const matchingProtectedArticle = Array.from(protectedBlock.querySelectorAll(".protected-article")).some((article) => {
+                        return !article.hidden;
+                    });
+
+                    if (matchingProtectedArticle) {
+                        setProtectedExpanded(protectedBlock, true);
+                    }
+                });
             }
+
+            category.querySelectorAll("[data-category-section]").forEach((section) => {
+                const visibleSectionArticle = Array.from(section.querySelectorAll(".article-item")).some((article) => {
+                    return !article.hidden;
+                });
+                section.hidden = !visibleSectionArticle;
+            });
 
             const categoryVisible = visibleArticles > 0;
             category.hidden = !categoryVisible;

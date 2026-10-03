@@ -271,6 +271,35 @@ h3 {
     margin-bottom: 0;
 }
 
+.category-section {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.category-section-plain {
+    margin-top: 12px;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.category-section-title {
+    margin: 0 0 8px;
+    color: var(--heading);
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.category-section .article-list {
+    margin: 0 0 12px;
+    padding-left: 22px;
+}
+
+.category-section .article-list:last-child,
+.category-section .protected-articles:last-child {
+    margin-bottom: 0;
+}
+
 .article-item-authors {
     flex-basis: 100%;
     margin: 4px 0 0;

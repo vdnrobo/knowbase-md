@@ -60,7 +60,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.3.0"
+SITE_VERSION = "1.4.0"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
@@ -625,6 +625,179 @@ def render_article_list_item(article, protected=False, show_authors=False):
     """
 
 
+def parse_article_number(article_slug):
+    match = re.match(r"^(\d{2})", article_slug)
+    if not match:
+        return None
+
+    return int(match.group(1))
+
+
+def load_category_sections(category_dir):
+    sections_path = os.path.join(category_dir, "sections.txt")
+    if not os.path.isfile(sections_path):
+        return []
+
+    sections = []
+    with open(sections_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            match = re.match(r"^(\d{2})\s*-\s*(\d{2})\s*:\s*(.+)$", line)
+            if not match:
+                continue
+
+            start = int(match.group(1))
+            end = int(match.group(2))
+            title = match.group(3).strip()
+
+            if start > end or not title:
+                continue
+
+            sections.append({
+                "start": start,
+                "end": end,
+                "title": title,
+            })
+
+    return sections
+
+
+def get_article_section(article, sections):
+    article_number = article["number"]
+    if article_number is None:
+        return None
+
+    for section in sections:
+        if section["start"] <= article_number <= section["end"]:
+            return section
+
+    return None
+
+
+def build_home_article_search_text(category, article, category_search_text):
+    return (
+        f'{category_search_text} {article["title"]} '
+        f'{article["search_text"]}'
+    )
+
+
+def render_home_article_lists(category, category_search_text):
+    sections = category["sections"]
+    if not sections:
+        return render_home_article_group(
+            category,
+            category["articles"],
+            category_search_text,
+        )
+
+    groups = [
+        {
+            "title": section["title"],
+            "section": section,
+            "articles": [],
+        }
+        for section in sections
+    ]
+    ungrouped_articles = []
+
+    for article in category["articles"]:
+        section = get_article_section(article, sections)
+        if section is None:
+            ungrouped_articles.append(article)
+            continue
+
+        group_index = sections.index(section)
+        groups[group_index]["articles"].append(article)
+
+    rendered_groups = ""
+    for group in groups:
+        if not group["articles"]:
+            continue
+
+        rendered_groups += render_home_article_group(
+            category,
+            group["articles"],
+            category_search_text,
+            group["title"],
+            f'{group["section"]["start"]:02d}-{group["section"]["end"]:02d}',
+        )
+
+    if ungrouped_articles:
+        rendered_groups += render_home_article_group(
+            category,
+            ungrouped_articles,
+            category_search_text,
+            "Без раздела",
+            "ungrouped",
+        )
+
+    return rendered_groups
+
+
+def render_home_article_group(category, articles, category_search_text, title="", id_suffix="main"):
+    links = ""
+    protected_links = ""
+    group_search_text = f"{category_search_text} {title}"
+
+    for article in articles:
+        article["search_text"] = build_home_article_search_text(
+            category,
+            article,
+            group_search_text,
+        )
+        if article["protected"]:
+            protected_links += render_article_list_item(
+                article,
+                protected=True,
+            )
+        else:
+            links += render_article_list_item(article)
+
+    regular_list = ""
+    if links:
+        regular_list = f"""
+            <ul class="article-list">
+                {links}
+            </ul>
+        """
+
+    protected_list = ""
+    if protected_links:
+        protected_id_source = f"{category['slug']}-{id_suffix}"
+        protected_id = f"protected-{normalize_category_slug(protected_id_source).lower()}"
+        protected_list = f"""
+            <div class="protected-articles" data-protected-articles>
+                <button class="protected-toggle" type="button" aria-expanded="false" aria-controls="{html.escape(protected_id)}">
+                    Показать защищённые статьи
+                </button>
+                <ul id="{html.escape(protected_id)}" class="article-list protected-article-list" hidden>
+                    {protected_links}
+                </ul>
+            </div>
+        """
+
+    if not regular_list and not protected_list:
+        return ""
+
+    heading = ""
+    group_class = "category-section"
+    if title:
+        heading = f'<h2 class="category-section-title">{html.escape(title)}</h2>'
+    else:
+        group_class += " category-section-plain"
+
+    return f"""
+        <section class="{group_class}" data-category-section>
+            {heading}
+            {regular_list}
+            {protected_list}
+        </section>
+    """
+
+
 def render_author_article_item(article):
     badge = ""
     protected_class = ""
@@ -663,12 +836,14 @@ def load_content():
         category_description_html = ""
         if category_description:
             category_description_html = render_description_markdown(category_description)
+        category_sections = load_category_sections(category_dir)
 
         category = {
             "slug": category_slug,
             "title": category_title,
             "description": category_description,
             "description_html": category_description_html,
+            "sections": category_sections,
             "password_env": get_category_password_env(category_slug),
             "articles": [],
         }
@@ -702,6 +877,7 @@ def load_content():
                 "protected": metadata["protected"],
                 "category": category,
                 "slug": article_slug,
+                "number": parse_article_number(article_slug),
                 "authors": article_authors,
             }
 
@@ -909,47 +1085,13 @@ class Handler(BaseHTTPRequestHandler):
                         f'{category["description_html"]}</div>'
                     )
 
-                links = ""
-                protected_links = ""
                 category_search_text = (
                     f'{category["title"]} {category["description"]}'
                 )
-
-                for article in category["articles"]:
-                    article_search_text = (
-                        f'{category_search_text} {article["title"]} '
-                        f'{article["search_text"]}'
-                    )
-                    article["search_text"] = article_search_text
-                    if article["protected"]:
-                        protected_links += render_article_list_item(
-                            article,
-                            protected=True,
-                        )
-                    else:
-                        links += render_article_list_item(article)
-
-                regular_list = ""
-                if links:
-                    regular_list = f"""
-                        <ul class="article-list">
-                            {links}
-                        </ul>
-                    """
-
-                protected_list = ""
-                if protected_links:
-                    protected_id = f"protected-{normalize_category_slug(category['slug']).lower()}"
-                    protected_list = f"""
-                        <div class="protected-articles" data-protected-articles>
-                            <button class="protected-toggle" type="button" aria-expanded="false" aria-controls="{html.escape(protected_id)}">
-                                Показать защищённые статьи
-                            </button>
-                            <ul id="{html.escape(protected_id)}" class="article-list protected-article-list" hidden>
-                                {protected_links}
-                            </ul>
-                        </div>
-                    """
+                article_lists = render_home_article_lists(
+                    category,
+                    category_search_text,
+                )
 
                 category_blocks += f"""
                     <details id="category-{html.escape(category["slug"])}" class="category" open data-search="{html.escape(category_search_text)}">
@@ -958,8 +1100,7 @@ class Handler(BaseHTTPRequestHandler):
                             {render_category_authors(category)}
                         </summary>
                         {description}
-                        {regular_list}
-                        {protected_list}
+                        {article_lists}
                     </details>
                 """
 

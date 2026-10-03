@@ -60,7 +60,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.2.0"
+SITE_VERSION = "1.3.0"
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"

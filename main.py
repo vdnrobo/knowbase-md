@@ -1,11 +1,15 @@
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from datetime import datetime
 import hashlib
 import html
 import hmac
 import mimetypes
 import os
 import re
+import secrets
+import sqlite3
+import time
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from xml.etree import ElementTree
 
@@ -60,7 +64,11 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.4.0"
+SITE_VERSION = "1.6.0"
+ACTIVITY_DB_PATH = os.path.join(os.environ.get("DATA_DIR", "./data"), "activity.sqlite3")
+VISITOR_COOKIE_NAME = "site_visitor"
+VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
+VISITOR_WINDOW_SECONDS = 24 * 60 * 60
 GITHUB_URL = "https://github.com/vdnrobo/knowbase-md"
 FOOTER_TEXT = (
     f"VDN 2026 · v{SITE_VERSION} · made by humans on Earth"
@@ -816,6 +824,117 @@ def render_author_article_item(article):
     """
 
 
+def open_activity_database():
+    os.makedirs(os.path.dirname(os.path.abspath(ACTIVITY_DB_PATH)), exist_ok=True)
+    connection = sqlite3.connect(ACTIVITY_DB_PATH, timeout=5)
+    try:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS visitors ("
+            "visitor_id TEXT PRIMARY KEY, last_seen REAL NOT NULL)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS visitors_last_seen ON visitors (last_seen)"
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS publications ("
+            "url TEXT PRIMARY KEY, first_seen REAL NOT NULL)"
+        )
+    except sqlite3.Error:
+        connection.close()
+        raise
+    return connection
+
+
+def record_visitor(visitor_id, now=None):
+    now = time.time() if now is None else now
+    visitor_hash = hashlib.sha256(visitor_id.encode("ascii")).hexdigest()
+    connection = open_activity_database()
+    try:
+        with connection:
+            connection.execute(
+                "DELETE FROM visitors WHERE last_seen <= ?",
+                (now - VISITOR_WINDOW_SECONDS,),
+            )
+            connection.execute(
+                "INSERT INTO visitors (visitor_id, last_seen) VALUES (?, ?) "
+                "ON CONFLICT(visitor_id) DO UPDATE SET last_seen = excluded.last_seen",
+                (visitor_hash, now),
+            )
+            return connection.execute("SELECT COUNT(*) FROM visitors").fetchone()[0]
+    finally:
+        connection.close()
+
+
+def get_recent_articles(articles, limit=5):
+    public_articles = [article for article in articles.values() if not article["protected"]]
+    timestamps = {}
+    for article in public_articles:
+        path = os.path.join(ARTICLES_DIR, article["category"]["slug"], article["slug"] + ".md")
+        try:
+            timestamps[article["url"]] = os.path.getmtime(path)
+        except OSError:
+            timestamps[article["url"]] = 0
+
+    connection = open_activity_database()
+    try:
+        with connection:
+            # Seed an existing library from file dates; keep publication order on later edits.
+            initialized = connection.execute("SELECT 1 FROM publications LIMIT 1").fetchone()
+            now = time.time()
+            connection.executemany(
+                "INSERT OR IGNORE INTO publications (url, first_seen) VALUES (?, ?)",
+                [
+                    (article["url"], now if initialized else timestamps[article["url"]])
+                    for article in public_articles
+                ],
+            )
+            publication_dates = dict(connection.execute("SELECT url, first_seen FROM publications"))
+    finally:
+        connection.close()
+
+    return [
+        (article, publication_dates[article["url"]])
+        for article in sorted(
+            public_articles,
+            key=lambda item: (-publication_dates[item["url"]], item["url"]),
+        )[:limit]
+    ]
+
+
+def render_home_sidebar(visitor_count, recent_articles):
+    count = str(visitor_count) if visitor_count is not None else "—"
+    recent_items = ""
+    for article, timestamp in recent_articles or []:
+        date = datetime.fromtimestamp(timestamp)
+        recent_items += f"""
+            <li>
+                <a href="{html.escape(article["url"], quote=True)}">{html.escape(article["title"])}</a>
+                <span class="recent-article-category">{html.escape(article["category"]["title"])}</span>
+                <time datetime="{date.date().isoformat()}">{date.strftime("%d.%m.%Y")}</time>
+            </li>
+        """
+
+    recent_content = (
+        f'<ol class="recent-articles">{recent_items}</ol>' if recent_items
+        else '<p class="sidebar-empty">Пока нет открытых статей.</p>'
+    )
+    if recent_articles is None:
+        recent_content = '<p class="sidebar-empty">Список временно недоступен.</p>'
+    return f"""
+        <aside class="home-sidebar" aria-label="Активность сайта">
+            <section class="home-visitor-stats" aria-labelledby="visitor-stats-title">
+                <h2 id="visitor-stats-title">Посетители</h2>
+                <p class="visitor-count">{count}</p>
+                <p class="visitor-period">За последние 24 часа</p>
+            </section>
+            <section class="home-recent" aria-labelledby="recent-articles-title">
+                <h2 id="recent-articles-title">Новые статьи</h2>
+                {recent_content}
+            </section>
+        </aside>
+    """
+
+
 def load_content():
     categories = []
     articles_by_url = {}
@@ -840,6 +959,7 @@ def load_content():
 
         category = {
             "slug": category_slug,
+            "url": f"/categories/{quote(category_slug)}",
             "title": category_title,
             "description": category_description,
             "description_html": category_description_html,
@@ -894,6 +1014,44 @@ def load_content():
 
 
 class Handler(BaseHTTPRequestHandler):
+    def end_headers(self):
+        visitor_cookie = getattr(self, "visitor_cookie", None)
+        if visitor_cookie:
+            self.send_header("Set-Cookie", visitor_cookie)
+            self.visitor_cookie = None
+        if getattr(self, "is_content_page", False):
+            self.send_header("Cache-Control", "private, no-store")
+        super().end_headers()
+
+    def track_visitor(self):
+        user_agent = self.headers.get("User-Agent", "")
+        if re.search(r"bot|crawler|spider|preview|curl/|python-urllib", user_agent, re.IGNORECASE):
+            connection = open_activity_database()
+            try:
+                return connection.execute(
+                    "SELECT COUNT(*) FROM visitors WHERE last_seen > ?",
+                    (time.time() - VISITOR_WINDOW_SECONDS,),
+                ).fetchone()[0]
+            finally:
+                connection.close()
+
+        cookies = SimpleCookie()
+        try:
+            cookies.load(self.headers.get("Cookie", ""))
+        except CookieError:
+            cookies = SimpleCookie()
+        cookie = cookies.get(VISITOR_COOKIE_NAME)
+        visitor_id = cookie.value if cookie else ""
+        if not re.fullmatch(r"[a-f0-9]{32}", visitor_id):
+            visitor_id = secrets.token_hex(16)
+            forwarded_proto = self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower()
+            secure = "; Secure" if forwarded_proto == "https" else ""
+            self.visitor_cookie = (
+                f"{VISITOR_COOKIE_NAME}={visitor_id}; Path=/; "
+                f"Max-Age={VISITOR_COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax{secure}"
+            )
+        return record_visitor(visitor_id)
+
     def send_html(self, content, status=200, headers=None):
         self.send_response(status)
         for name, value in (headers or {}).items():
@@ -968,7 +1126,8 @@ class Handler(BaseHTTPRequestHandler):
                         <p class="auth-kicker">Закрытая статья</p>
                         <h1>{escaped_title}</h1>
                         <p class="auth-note">
-                            Эта статья относится к разделу «{escaped_category}».
+                            Эта статья относится к разделу
+                            «<a href="{html.escape(category["url"])}">{escaped_category}</a>».
                             Введите пароль раздела, чтобы открыть все защищённые статьи внутри него.
                         </p>
                         {error_html}
@@ -987,6 +1146,8 @@ class Handler(BaseHTTPRequestHandler):
         """, status=status)
 
     def do_POST(self):
+        self.visitor_cookie = None
+        self.is_content_page = False
         path = urlparse(self.path).path
         categories, articles, authors = load_content()
 
@@ -1037,6 +1198,8 @@ class Handler(BaseHTTPRequestHandler):
         self.render_password_page(article, status=403, error=error)
 
     def do_GET(self):
+        self.visitor_cookie = None
+        self.is_content_page = False
         path = urlparse(self.path).path
 
         if path == "/favicon.ico" and os.path.isfile(FAVICON_FILE):
@@ -1067,8 +1230,33 @@ class Handler(BaseHTTPRequestHandler):
 
         categories, articles, authors = load_content()
 
+        category_page = next(
+            (category for category in categories if category["url"] == path),
+            None,
+        )
+        if path == "/":
+            self.is_content_page = True
+        elif path == "/authors" or path in articles or category_page is not None:
+            self.is_content_page = True
+        elif path.startswith("/authors/"):
+            parts = [unquote(part) for part in path.strip("/").split("/") if part]
+            self.is_content_page = len(parts) == 2 and parts[1] in authors
+
+        visitor_count = None
+        if self.is_content_page:
+            try:
+                visitor_count = self.track_visitor()
+            except (OSError, sqlite3.Error) as error:
+                self.log_error("Cannot update visitor statistics: %s", error)
+
         # --- MAIN PAGE ---
         if path == "/":
+            try:
+                recent_articles = get_recent_articles(articles)
+            except (OSError, sqlite3.Error) as error:
+                self.log_error("Cannot load recent articles: %s", error)
+                recent_articles = None
+            sidebar = render_home_sidebar(visitor_count, recent_articles)
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
             self.end_headers()
@@ -1094,12 +1282,13 @@ class Handler(BaseHTTPRequestHandler):
                 )
 
                 category_blocks += f"""
-                    <details id="category-{html.escape(category["slug"])}" class="category" open data-search="{html.escape(category_search_text)}">
+                    <details id="category-{html.escape(category["slug"])}" class="category" open data-search-category data-search="{html.escape(category_search_text)}">
                         <summary>
                             <span class="category-title">{html.escape(category["title"])}</span>
                             {render_category_authors(category)}
                         </summary>
                         {description}
+                        <p class="category-page-link"><a href="{html.escape(category["url"])}">Открыть раздел</a></p>
                         {article_lists}
                     </details>
                 """
@@ -1134,8 +1323,9 @@ class Handler(BaseHTTPRequestHandler):
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
-            <body>
-                <div class="container">
+            <body class="home-page">
+                <div class="home-layout">
+                <main class="container home-content">
                     <header class="site-brand">
                         <img class="site-brand-icon" src="/static/site-icon.svg" alt="" width="48" height="48">
                         <div>
@@ -1152,10 +1342,61 @@ class Handler(BaseHTTPRequestHandler):
                     {category_blocks}
                     {home_authors}
                     {site_footer}
+                </main>
+                {sidebar}
                 </div>
             </body>
             </html>
             """.encode("utf-8"))
+
+        # --- CATEGORY PAGE ---
+        elif category_page is not None:
+            category = category_page
+            category_search_text = f'{category["title"]} {category["description"]}'
+            article_lists = render_home_article_lists(category, category_search_text)
+            description = ""
+            if category["description_html"]:
+                description = (
+                    '<div class="category-description">'
+                    f'{category["description_html"]}</div>'
+                )
+            self.send_html(f"""
+            <!DOCTYPE html>
+            <html lang="ru">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>{html.escape(category["title"])} — База знаний</title>
+                <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <link rel="stylesheet" href="/static/style.css">
+                <script src="/static/site.js" defer></script>
+            </head>
+            <body class="category-page">
+                <div class="container">
+                    <a class="page-mark" href="/" aria-label="На главную">
+                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
+                        <span>VDN на Robo548</span>
+                    </a>
+                    <main>
+                        <header class="category-page-header">
+                            <h1>{html.escape(category["title"])}</h1>
+                            {render_category_authors(category)}
+                            {description}
+                        </header>
+                        <div class="search-box">
+                            <label for="site-search">Поиск по разделу</label>
+                            <input id="site-search" type="search" placeholder="Название, автор или текст статьи">
+                        </div>
+                        <p id="no-results" class="no-results" hidden>Ничего не найдено.</p>
+                        <div class="category-articles" data-search-category data-search="{html.escape(category_search_text)}">
+                            {article_lists}
+                        </div>
+                    </main>
+                    {render_site_footer()}
+                </div>
+            </body>
+            </html>
+            """)
 
         # --- AUTHORS LIST ---
         elif path == "/authors":
@@ -1267,7 +1508,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     article_groups += f"""
                         <section class="author-article-group">
-                            <h3>{html.escape(category["title"])}</h3>
+                            <h3><a href="{html.escape(category["url"])}">{html.escape(category["title"])}</a></h3>
                             <ul class="article-list">
                                 {article_items}
                             </ul>
@@ -1410,6 +1651,9 @@ class Handler(BaseHTTPRequestHandler):
                     <div class="article-layout">
                         {toc}
                         <main class="article-main">
+                            <nav class="article-category" aria-label="Раздел статьи">
+                                <a href="{html.escape(category["url"])}">{html.escape(category["title"])}</a>
+                            </nav>
                             {article_authors}
                             <article class="article-body">
                                 {article["content"]}
@@ -1429,7 +1673,7 @@ class Handler(BaseHTTPRequestHandler):
             category_links = ""
             for category in categories:
                 category_links += (
-                    f'<li><a href="/#category-{quote(category["slug"])}">'
+                    f'<li><a href="{html.escape(category["url"])}">'
                     f'{html.escape(category["title"])}</a></li>'
                 )
 

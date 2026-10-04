@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    const categories = Array.from(document.querySelectorAll(".category"));
+    const categories = Array.from(document.querySelectorAll("[data-search-category]"));
     const noResults = document.querySelector("#no-results");
 
     searchInput.addEventListener("input", () => {
@@ -143,7 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const categoryVisible = visibleArticles > 0;
             category.hidden = !categoryVisible;
 
-            if (query && categoryVisible) {
+            if (query && categoryVisible && category.tagName === "DETAILS") {
                 category.open = true;
             }
 

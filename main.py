@@ -64,7 +64,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.6.0"
+SITE_VERSION = "1.7.0"
 ACTIVITY_DB_PATH = os.path.join(os.environ.get("DATA_DIR", "./data"), "activity.sqlite3")
 VISITOR_COOKIE_NAME = "site_visitor"
 VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
@@ -300,6 +300,7 @@ def parse_article_metadata(content):
     metadata = {
         "protected": False,
         "author_slugs": [],
+        "editor_slugs": [],
     }
 
     while body.startswith("<!--"):
@@ -315,14 +316,17 @@ def parse_article_metadata(content):
             body = body[comment_end + 3:].lstrip()
             continue
 
-        authors_match = re.match(r"authors?\s*:\s*(.+)$", comment, re.IGNORECASE)
-        if authors_match:
-            author_slugs = [
-                author_slug.strip()
-                for author_slug in authors_match.group(1).split(",")
-                if author_slug.strip()
+        people_match = re.match(r"(authors?|editors?)\s*:\s*(.*)$", comment, re.IGNORECASE)
+        if people_match:
+            field = "author_slugs" if people_match.group(1).lower().startswith("author") else "editor_slugs"
+            slugs = [
+                slug.strip()
+                for slug in people_match.group(2).split(",")
+                if slug.strip()
             ]
-            metadata["author_slugs"].extend(author_slugs)
+            for slug in slugs:
+                if slug not in metadata[field]:
+                    metadata[field].append(slug)
             body = body[comment_end + 3:].lstrip()
             continue
 
@@ -499,6 +503,7 @@ def load_authors():
             "photo_url": photo_url,
             "url": f"/authors/{quote(author_slug)}",
             "articles": [],
+            "edited_articles": [],
         }
 
     return authors
@@ -514,6 +519,7 @@ def get_or_create_author(authors, author_slug):
             "photo_url": "",
             "url": f"/authors/{quote(author_slug)}",
             "articles": [],
+            "edited_articles": [],
         }
 
     return authors[author_slug]
@@ -551,12 +557,23 @@ def render_author_links(authors):
 
 
 def render_article_authors(article, class_name):
-    if not article["authors"]:
+    authors = article["authors"]
+    label = "Авторы" if len(authors) > 1 else "Автор"
+    return render_article_contributors(authors, class_name, label)
+
+
+def render_article_editors(article):
+    editors = article["editors"]
+    label = "Редакторы" if len(editors) > 1 else "Редактор"
+    return render_article_contributors(editors, "article-page-authors article-page-editors", label)
+
+
+def render_article_contributors(contributors, class_name, label):
+    if not contributors:
         return ""
 
-    label = "Авторы" if len(article["authors"]) > 1 else "Автор"
     author_items = ""
-    for author in article["authors"]:
+    for author in contributors:
         author_items += f"""
             <a class="article-author-link" href="{author["url"]}">
                 {render_author_photo(author, "article-author-photo")}
@@ -824,6 +841,40 @@ def render_author_article_item(article):
     """
 
 
+def render_author_article_groups(articles, empty_message):
+    articles_by_category = {}
+    for article in sorted(
+        articles,
+        key=lambda item: (
+            item["category"]["slug"].casefold(),
+            item["slug"].casefold(),
+        ),
+    ):
+        category = article["category"]
+        articles_by_category.setdefault(category["slug"], {
+            "category": category,
+            "articles": [],
+        })["articles"].append(article)
+
+    groups = ""
+    for group in articles_by_category.values():
+        category = group["category"]
+        article_items = "".join(
+            render_author_article_item(article)
+            for article in group["articles"]
+        )
+        groups += f"""
+            <section class="author-article-group">
+                <h3><a href="{html.escape(category["url"])}">{html.escape(category["title"])}</a></h3>
+                <ul class="article-list">
+                    {article_items}
+                </ul>
+            </section>
+        """
+
+    return groups or f'<p class="no-results">{html.escape(empty_message)}</p>'
+
+
 def open_activity_database():
     os.makedirs(os.path.dirname(os.path.abspath(ACTIVITY_DB_PATH)), exist_ok=True)
     connection = sqlite3.connect(ACTIVITY_DB_PATH, timeout=5)
@@ -983,28 +1034,37 @@ def load_content():
                 get_or_create_author(authors, author_slug)
                 for author_slug in metadata["author_slugs"]
             ]
-            author_search_text = " ".join(
-                author["title"] for author in article_authors
+            article_editors = [
+                get_or_create_author(authors, editor_slug)
+                for editor_slug in metadata["editor_slugs"]
+            ]
+            contributor_search_text = " ".join(
+                author["title"] for author in article_authors + article_editors
             )
             content_html, toc_html = render_markdown(content)
+            article_title = get_article_title(content, article_slug)
+            search_content = article_title if metadata["protected"] else content
             url = f"/{quote(category_slug)}/{quote(article_slug)}"
             article = {
-                "title": get_article_title(content, article_slug),
+                "title": article_title,
                 "content": content_html,
                 "toc": toc_html,
                 "url": url,
-                "search_text": f"{content} {author_search_text}",
+                "search_text": f"{search_content} {contributor_search_text}",
                 "protected": metadata["protected"],
                 "category": category,
                 "slug": article_slug,
                 "number": parse_article_number(article_slug),
                 "authors": article_authors,
+                "editors": article_editors,
             }
 
             category["articles"].append(article)
             articles_by_url[url] = article
             for author in article_authors:
                 author["articles"].append(article)
+            for editor in article_editors:
+                editor["edited_articles"].append(article)
 
         if category["articles"]:
             categories.append(category)
@@ -1404,6 +1464,7 @@ class Handler(BaseHTTPRequestHandler):
             author_cards = ""
             for author in sort_authors(authors):
                 articles_count = len(author["articles"])
+                edited_count = len(author["edited_articles"])
                 description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
                 author_cards += f"""
                     <article class="author-card">
@@ -1413,7 +1474,7 @@ class Handler(BaseHTTPRequestHandler):
                         <div class="author-card-body">
                             <h2><a href="{author["url"]}">{html.escape(author["title"])}</a></h2>
                             <div class="author-description">{description}</div>
-                            <p class="author-article-count">Статей: {articles_count}</p>
+                            <p class="author-article-count">Как автор: {articles_count} · Как редактор: {edited_count}</p>
                         </div>
                     </article>
                 """
@@ -1485,38 +1546,12 @@ class Handler(BaseHTTPRequestHandler):
                 author = authors[parts[1]]
                 site_footer = render_site_footer()
                 description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
-                articles_by_category = {}
-                for article in sorted(
-                    author["articles"],
-                    key=lambda item: (
-                        item["category"]["slug"].casefold(),
-                        item["slug"].casefold(),
-                    ),
-                ):
-                    category = article["category"]
-                    articles_by_category.setdefault(category["slug"], {
-                        "category": category,
-                        "articles": [],
-                    })["articles"].append(article)
-
-                article_groups = ""
-                for group in articles_by_category.values():
-                    category = group["category"]
-                    article_items = "".join(
-                        render_author_article_item(article)
-                        for article in group["articles"]
-                    )
-                    article_groups += f"""
-                        <section class="author-article-group">
-                            <h3><a href="{html.escape(category["url"])}">{html.escape(category["title"])}</a></h3>
-                            <ul class="article-list">
-                                {article_items}
-                            </ul>
-                        </section>
-                    """
-
-                if not article_groups:
-                    article_groups = '<p class="no-results">Статьи пока не указаны.</p>'
+                article_groups = render_author_article_groups(
+                    author["articles"], "Авторские статьи пока не указаны.",
+                )
+                edited_groups = render_author_article_groups(
+                    author["edited_articles"], "Редакторские статьи пока не указаны.",
+                )
 
                 self.send_html(f"""
                 <!DOCTYPE html>
@@ -1543,9 +1578,13 @@ class Handler(BaseHTTPRequestHandler):
                                     <div class="author-description">{description}</div>
                                 </div>
                             </section>
-                            <section class="author-articles">
+                            <section class="author-articles author-written-articles">
                                 <h2>Статьи автора</h2>
                                 {article_groups}
+                            </section>
+                            <section class="author-articles author-edited-articles">
+                                <h2>Статьи под редакцией</h2>
+                                {edited_groups}
                             </section>
                         </main>
                         {site_footer}
@@ -1565,6 +1604,7 @@ class Handler(BaseHTTPRequestHandler):
             site_footer = render_site_footer()
             article_index = category["articles"].index(article)
             article_authors = render_article_authors(article, "article-page-authors")
+            article_editors = render_article_editors(article)
             previous_article = (
                 category["articles"][article_index - 1] if article_index > 0 else None
             )
@@ -1624,7 +1664,6 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(article["title"])}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
                 <link rel="stylesheet" href="/static/style.css">
                 <script>
                     window.MathJax = {{
@@ -1655,6 +1694,7 @@ class Handler(BaseHTTPRequestHandler):
                                 <a href="{html.escape(category["url"])}">{html.escape(category["title"])}</a>
                             </nav>
                             {article_authors}
+                            {article_editors}
                             <article class="article-body">
                                 {article["content"]}
                             </article>

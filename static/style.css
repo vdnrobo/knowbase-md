@@ -483,6 +483,8 @@ h3 {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .article-author-link {
@@ -490,8 +492,14 @@ h3 {
     align-items: center;
     gap: 7px;
     min-width: 0;
+    max-width: 100%;
     color: var(--heading);
     font-weight: 800;
+}
+
+.article-author-link span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .article-author-link:hover {
@@ -596,6 +604,10 @@ h3 {
 
 .author-articles h2 {
     margin-bottom: 12px;
+}
+
+.author-articles + .author-articles {
+    margin-top: 32px;
 }
 
 .author-article-group {
@@ -956,38 +968,82 @@ pre .hljs {
     color: var(--code-text);
 }
 
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-built_in,
-.hljs-name,
-.hljs-tag {
+pre code .hljs-subst,
+pre code .hljs-punctuation,
+pre code .hljs-operator,
+pre code .hljs-char,
+pre code .hljs-code,
+pre code .hljs-formula {
+    color: var(--code-text);
+}
+
+pre code .hljs-keyword,
+pre code .hljs-doctag,
+pre code .hljs-template-tag,
+pre code .hljs-selector-tag,
+pre code .hljs-selector-pseudo,
+pre code .hljs-built_in,
+pre code .hljs-type,
+pre code .hljs-name,
+pre code .hljs-tag {
     color: #8fb4ff;
 }
 
-.hljs-string,
-.hljs-title,
-.hljs-section,
-.hljs-attribute,
-.hljs-literal {
+pre code .hljs-string,
+pre code .hljs-regexp,
+pre code .hljs-title,
+pre code .hljs-section,
+pre code .hljs-attribute,
+pre code .hljs-literal,
+pre code .hljs-link {
     color: #9be7c4;
 }
 
-.hljs-number,
-.hljs-symbol,
-.hljs-bullet {
+pre code .hljs-number,
+pre code .hljs-symbol,
+pre code .hljs-bullet,
+pre code .hljs-attr,
+pre code .hljs-property,
+pre code .hljs-selector-attr,
+pre code .hljs-selector-class,
+pre code .hljs-selector-id {
     color: #ffd38a;
 }
 
-.hljs-comment,
-.hljs-quote {
+pre code .hljs-comment,
+pre code .hljs-quote {
     color: #9aa7d3;
 }
 
-.hljs-variable,
-.hljs-template-variable,
-.hljs-params,
-.hljs-meta {
+pre code .hljs-variable,
+pre code .hljs-template-variable,
+pre code .hljs-params,
+pre code .hljs-meta {
     color: #f0b7ff;
+}
+
+pre code .hljs-emphasis {
+    color: var(--code-text);
+    font-style: italic;
+}
+
+pre code .hljs-strong {
+    color: var(--code-text);
+    font-weight: 700;
+}
+
+pre code .hljs-addition {
+    color: #9be7c4;
+    background: rgba(155, 231, 196, 0.08);
+}
+
+pre code .hljs-deletion {
+    color: #ffb4c0;
+    background: rgba(255, 180, 192, 0.08);
+}
+
+pre code .hljs-link {
+    text-decoration: underline;
 }
 
 :not(pre) > code {

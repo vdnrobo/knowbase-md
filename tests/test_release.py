@@ -7,13 +7,13 @@ import main
 
 class ReleaseTests(unittest.TestCase):
     def test_release_version_is_consistent(self):
-        self.assertEqual(main.SITE_VERSION, '2.0.2')
+        self.assertEqual(main.SITE_VERSION, '2.0.3')
         readme = Path('README.md').read_text(encoding='utf-8')
-        self.assertIn('Текущая версия: **2.0.2**.', readme)
+        self.assertIn('Текущая версия: **2.0.3**.', readme)
         changelog = Path('CHANGELOG.md').read_text(encoding='utf-8')
         first_release = re.search(r'^## (\d+\.\d+\.\d+) - (\d{4}-\d{2}-\d{2})$', changelog, re.MULTILINE)
-        self.assertEqual(first_release.groups(), ('2.0.2', '2026-11-24'))
-        self.assertIn('v2.0.2', main.render_site_footer())
+        self.assertEqual(first_release.groups(), ('2.0.3', '2026-11-24'))
+        self.assertIn('v2.0.3', main.render_site_footer())
 
     def test_fresh_server_guide_is_linked_and_uses_private_backend(self):
         guide = Path('docs/deploy-ubuntu-26.04.md').read_text(encoding='utf-8')
@@ -22,7 +22,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('User=knowbase', guide)
         self.assertIn('ReadWritePaths=/opt/knowbase-md/data', guide)
         self.assertIn('proxy_pass http://127.0.0.1:8000', guide)
-        self.assertIn('git checkout --detach v2.0.2', guide)
+        self.assertIn('git checkout --detach v2.0.3', guide)
         self.assertIn('chmod 640 .env\numask 022', guide)
         self.assertIn('scp -r .\\articles .\\authors', guide)
         for filename in ('README.md', 'docs/site-guide.md'):

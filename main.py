@@ -67,7 +67,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "2.0.2"
+SITE_VERSION = "2.0.3"
 SITE_THEMES = (
     ("classic", "Классическая"),
     ("winter", "Зимняя"),
@@ -298,10 +298,27 @@ def render_site_footer():
     """
 
 
+def get_enabled_themes():
+    configured = os.environ.get("ENABLED_THEMES", "").strip()
+    enabled = {value.strip().lower() for value in configured.split(",")} if configured else {
+        value for value, _ in SITE_THEMES
+    }
+    enabled.add("classic")
+    return tuple((value, label) for value, label in SITE_THEMES if value in enabled)
+
+
+def render_theme_bootstrap():
+    enabled = ",".join(value for value, _ in get_enabled_themes())
+    return (
+        f'<meta name="site-themes" content="{enabled}">'
+        '<script src="/static/theme.js"></script>'
+    )
+
+
 def render_theme_switcher():
     options = "".join(
         f'<option value="{value}">{label}</option>'
-        for value, label in SITE_THEMES
+        for value, label in get_enabled_themes()
     )
     return f"""
         <div class="season-background" aria-hidden="true">
@@ -1234,7 +1251,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
             <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
             <title>{html.escape(title)} — База знаний</title>
             <link rel="icon" href="/favicon.ico" type="image/x-icon">
-            <script src="/static/theme.js"></script><link rel="stylesheet" href="/static/style.css">
+            {render_theme_bootstrap()}<link rel="stylesheet" href="/static/style.css">
             <script src="/static/site.js" defer></script></head><body>
             <div class="container">{render_page_header()}<main><h1>{html.escape(title)}</h1>{body}</main>{render_site_footer()}</div>
             </body></html>''', status, headers)
@@ -1342,7 +1359,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Доступ ограничен — {escaped_title}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <script src="/static/theme.js"></script>
+                {render_theme_bootstrap()}
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
@@ -1577,7 +1594,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>vdn@robo548</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <script src="/static/theme.js"></script>
+                {render_theme_bootstrap()}
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
@@ -1634,7 +1651,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(category["title"])} — База знаний</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <script src="/static/theme.js"></script>
+                {render_theme_bootstrap()}
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
@@ -1694,7 +1711,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Авторы</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <script src="/static/theme.js"></script>
+                {render_theme_bootstrap()}
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
@@ -1726,7 +1743,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Автор не найден</title>
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                    <script src="/static/theme.js"></script>
+                    {render_theme_bootstrap()}
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
                 </head>
@@ -1761,7 +1778,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>{html.escape(author["title"])}</title>
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                    <script src="/static/theme.js"></script>
+                    {render_theme_bootstrap()}
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
                 </head>
@@ -1869,7 +1886,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(article["title"])}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-                <script src="/static/theme.js"></script>
+                {render_theme_bootstrap()}
                 <link rel="stylesheet" href="/static/style.css">
                 <script>
                     window.MathJax = {{
@@ -1948,7 +1965,7 @@ class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>404 — Робот потерял страницу</title>
             <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
-            <script src="/static/theme.js"></script>
+            {render_theme_bootstrap()}
             <link rel="stylesheet" href="/static/style.css">
             <script src="/static/site.js" defer></script>
         </head>

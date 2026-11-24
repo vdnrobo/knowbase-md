@@ -1,15 +1,20 @@
 import json
+import os
 from pathlib import Path
 import re
 import struct
 import unittest
 import xml.etree.ElementTree as ET
+from unittest.mock import patch
 
 import main
 import test_category_pages
 
 
 class ThemeMarkupTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.dict(os.environ, {'ENABLED_THEMES': ''}))
+
     def test_switcher_has_all_options_and_no_script_fallback(self):
         body = main.render_theme_switcher()
         self.assertIn('class="theme-switcher" hidden', body)
@@ -149,6 +154,7 @@ class ThemeMarkupTests(unittest.TestCase):
 
 class ThemePageTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.dict(os.environ, {'ENABLED_THEMES': ''}))
         self.fixture = test_category_pages.CategoryPageTests('test_loaded_categories_have_urls')
         self.addCleanup(self.fixture.doCleanups)
         self.fixture.setUp()
@@ -169,6 +175,7 @@ class ThemePageTests(unittest.TestCase):
                 self.assertEqual(status, expected_status)
                 self.assertEqual(body.count('src="/static/theme.js"'), 1)
                 self.assertIn('<script src="/static/theme.js"></script>', body)
+                self.assertLess(body.index('name="site-themes"'), body.index('src="/static/theme.js"'))
                 self.assertLess(body.index('src="/static/theme.js"'), body.index('href="/static/style.css"'))
                 self.assertEqual(body.count('data-theme-select'), 1)
                 self.assertEqual(body.count('data-color-mode-switch'), 1)
@@ -190,6 +197,44 @@ class ThemePageTests(unittest.TestCase):
         content_type = next(value for key, value in headers.items() if key.lower() == 'content-type')
         self.assertIn('javascript', content_type)
         self.assertIn('siteTheme', body)
+
+    def test_disabled_themes_are_excluded_on_all_page_types(self):
+        with patch.dict(os.environ, {'ENABLED_THEMES': 'winter'}):
+            for path in ('/', '/categories/01-course', '/01-course/00-intro',
+                         '/01-course/11-closed', '/authors', '/authors/alex',
+                         '/authors/missing', '/missing', '/bookmarks', '/updates', '/paths'):
+                with self.subTest(path=path):
+                    _, _, body = self.fixture.request(path)
+                    self.assertIn('<meta name="site-themes" content="classic,winter">', body)
+                    self.assertEqual(re.findall(r'<option value="([^"]+)">', body), ['classic', 'winter'])
+
+
+class ThemeAvailabilityTests(unittest.TestCase):
+    def test_missing_or_empty_setting_keeps_all_themes(self):
+        for value in (None, '', '  '):
+            with self.subTest(value=value), patch.dict(os.environ):
+                if value is None:
+                    os.environ.pop('ENABLED_THEMES', None)
+                else:
+                    os.environ['ENABLED_THEMES'] = value
+                self.assertEqual(main.get_enabled_themes(), main.SITE_THEMES)
+
+    def test_allowlist_is_normalized_and_retains_standard_order(self):
+        with patch.dict(os.environ, {'ENABLED_THEMES': ' autumn, WINTER,autumn,unknown,67 '}):
+            self.assertEqual([value for value, _ in main.get_enabled_themes()],
+                             ['classic', 'winter', 'autumn', '67'])
+
+    def test_classic_is_always_available(self):
+        for value in ('classic', 'invalid', ', ,'):
+            with self.subTest(value=value), patch.dict(os.environ, {'ENABLED_THEMES': value}):
+                self.assertEqual(main.get_enabled_themes(), (main.SITE_THEMES[0],))
+                self.assertEqual(main.render_theme_switcher().count('<option '), 1)
+
+    def test_bootstrap_only_exposes_known_theme_ids_before_script(self):
+        with patch.dict(os.environ, {'ENABLED_THEMES': 'winter,\"><script>alert(1)</script>'}):
+            self.assertEqual(main.render_theme_bootstrap(),
+                             '<meta name="site-themes" content="classic,winter">'
+                             '<script src="/static/theme.js"></script>')
 
 
 if __name__ == '__main__':

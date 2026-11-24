@@ -8,7 +8,10 @@
         if (root.dataset.imageLoading === "pending") delete root.dataset.imageLoading;
     }, 5000);
 
-    const themes = new Set(["classic", "winter", "spring", "summer", "autumn", "67", "magic", "hello-kitty", "548", "robo548", "minions"]);
+    const knownThemes = new Set(["classic", "winter", "spring", "summer", "autumn", "67", "magic", "hello-kitty", "548", "robo548", "minions"]);
+    const configuration = document.querySelector('meta[name="site-themes"]');
+    const enabled = configuration ? configuration.content.split(",") : [...knownThemes];
+    const themes = new Set(["classic", ...enabled.filter(theme => knownThemes.has(theme))]);
     const lightOnlyThemes = new Set(["minions", "hello-kitty", "548", "robo548"]);
     const storageKey = "siteTheme";
     const modeStorageKey = "siteColorMode";
@@ -45,8 +48,11 @@
 
     const connectSwitchers = () => {
         document.querySelectorAll("[data-theme-select]").forEach((select) => {
+            Array.from(select.options).forEach(option => {
+                if (!themes.has(option.value)) option.remove();
+            });
             select.value = document.documentElement.dataset.theme;
-            select.closest(".theme-switcher").hidden = false;
+            select.closest(".theme-switcher").hidden = themes.size < 2;
             select.addEventListener("change", () => {
                 const theme = applyTheme(select.value);
                 select.value = theme;

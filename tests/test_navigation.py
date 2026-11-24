@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -31,6 +32,7 @@ class NavigationPageTests(unittest.TestCase):
                 status, _, body = self.fixture.request(path)
                 self.assertEqual(status, expected_status)
                 self.assertEqual(body.count('<script src="/static/navigation.js" async></script>'), 1)
+                self.assertEqual(body.count('<script src="/static/images.js" async></script>'), 1)
                 self.assertNotIn('class="page-loading"', body)
 
     def test_password_error_keeps_loader_and_does_not_reveal_content(self):
@@ -51,6 +53,19 @@ class NavigationPageTests(unittest.TestCase):
 
     def test_shared_footer_has_one_loader(self):
         self.assertEqual(main.render_site_footer().count('src="/static/navigation.js"'), 1)
+
+    def test_arrival_does_not_start_another_loading_screen(self):
+        source = Path('static/navigation.js').read_text(encoding='utf-8')
+        self.assertNotIn('document.readyState', source)
+        self.assertNotIn('addEventListener("load", reset', source)
+
+    def test_image_script_is_public_and_waits_for_decoding(self):
+        status, headers, body = self.fixture.request('/static/images.js')
+        self.assertEqual(status, 200)
+        self.assertIn('javascript', next(value for key, value in headers.items() if key.lower() == 'content-type'))
+        self.assertIn('await image.decode()', body)
+        self.assertIn('MutationObserver', body)
+        self.assertIn('prepareBackgrounds', body)
 
 
 if __name__ == '__main__':

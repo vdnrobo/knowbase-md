@@ -31,7 +31,7 @@
             }
             indicator.hidden = false;
         }, delay);
-        // A cancelled navigation or an unavailable CDN must not cover the page indefinitely.
+        // A cancelled navigation must not cover the page indefinitely.
         resetTimer = setTimeout(reset, timeout);
     };
 
@@ -67,9 +67,7 @@
 
     window.addEventListener("pageshow", reset);
     window.addEventListener("pagehide", reset);
-    window.addEventListener("load", reset, { once: true });
     window.addEventListener("keydown", (event) => {
         if (event.key === "Escape") reset();
     });
-    if (document.readyState !== "complete") show(3000);
 })();

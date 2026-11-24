@@ -1,6 +1,13 @@
 (() => {
     "use strict";
 
+    const root = document.documentElement;
+    root.dataset.imageLoading = "pending";
+    // Keep images available if the separate image loader cannot be downloaded.
+    setTimeout(() => {
+        if (root.dataset.imageLoading === "pending") delete root.dataset.imageLoading;
+    }, 5000);
+
     const themes = new Set(["classic", "winter", "spring", "summer", "autumn", "67", "magic", "hello-kitty", "548", "robo548", "minions"]);
     const lightOnlyThemes = new Set(["minions", "hello-kitty", "548", "robo548"]);
     const storageKey = "siteTheme";

@@ -67,7 +67,7 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "2.0.1"
+SITE_VERSION = "2.0.2"
 SITE_THEMES = (
     ("classic", "Классическая"),
     ("winter", "Зимняя"),
@@ -288,6 +288,7 @@ def render_site_footer():
             · <a href="/bookmarks">Закладки</a> · <a href="/updates">Обновления</a>
             · <a href="/paths">Учебные маршруты</a>
         </footer>
+        <script src="/static/images.js" async></script>
         <script src="/static/navigation.js" async></script>
         <script src="/static/vendor/marked.umd.js" defer></script>
         <script src="/static/vendor/purify.min.js" defer></script>

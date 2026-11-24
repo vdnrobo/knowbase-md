@@ -46,6 +46,16 @@
     .page-loading { display: none; }
 }
 
+html[data-image-loading] img:not([data-image-ready]) {
+    visibility: hidden !important;
+}
+
+html[data-image-loading] .season-background:not([data-pattern-ready])::before,
+html[data-image-loading] .season-background-secondary:not([data-image-ready]),
+html[data-image-loading] .season-background:not([data-corner-ready])::after {
+    visibility: hidden;
+}
+
 :root {
     color-scheme: light;
     --page-bg: #f5f7ff;

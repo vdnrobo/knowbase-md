@@ -1,4 +1,4 @@
-# Установка knowbase-md 2.0.1 на чистую Ubuntu 26.04
+# Установка knowbase-md 2.0.2 на чистую Ubuntu 26.04
 
 Инструкция рассчитана на **пустой сервер Ubuntu Server 26.04 LTS**, доступ по SSH и собственный домен. Команды на сервере выполняются от `root` в Bash. Для сервера с уже работающими сайтами не удаляйте их конфигурацию: используйте [инструкцию обновления существующей установки](site-guide.md).
 
@@ -39,7 +39,7 @@ python3 --version
 useradd --system --user-group --home-dir /opt/knowbase-md --shell /usr/sbin/nologin knowbase
 git clone --branch master https://github.com/vdnrobo/knowbase-md.git /opt/knowbase-md
 cd /opt/knowbase-md
-git checkout --detach v2.0.1
+git checkout --detach v2.0.2
 
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
@@ -48,7 +48,7 @@ install -d -o root -g knowbase -m 750 articles authors learning-paths
 install -d -o knowbase -g knowbase -m 750 data
 ```
 
-Ветка проекта называется `master`. Переключение на тег `v2.0.1` устанавливает именно этот релиз; detached HEAD здесь ожидаем. Код и виртуальное окружение остаются принадлежащими `root`, пользователь `knowbase` получает право записи только в данные приложения.
+Ветка проекта называется `master`. Переключение на тег `v2.0.2` устанавливает именно этот релиз; detached HEAD здесь ожидаем. Код и виртуальное окружение остаются принадлежащими `root`, пользователь `knowbase` получает право записи только в данные приложения.
 
 Nginx устанавливается из репозитория Ubuntu. Официальное руководство: [установка Nginx](https://ubuntu.com/server/docs/how-to/web-services/install-nginx/).
 
@@ -109,11 +109,14 @@ ARTICLE_PASSWORD_10_3D=
 EOF
 chown root:knowbase .env
 chmod 640 .env
+umask 022
 printf 'Пароль администратора: %s\n' "$ADMIN_PASSWORD"
 unset ADMIN_PASSWORD
 ```
 
 Сохраните выведенный пароль в своём менеджере паролей. Он используется на `/admin/feedback` и включает приём замечаний. Если эта функция не нужна, оставьте `ADMIN_PASSWORD=` пустым.
+
+После создания `.env` обязательно возвращается `umask 022`. Это не меняет его права `640`, но позволяет пользователю сервиса читать новые файлы кода при последующих установках зависимостей и обновлениях Git.
 
 При необходимости задайте пароли защищённых категорий:
 
@@ -251,7 +254,7 @@ nginx -T
 
 Откройте `https://ваш-домен/` и проверьте:
 
-1. Главная показывает перенесённые категории, в футере стоит `v2.0.1`.
+1. Главная показывает перенесённые категории, в футере стоит `v2.0.2`.
 2. Изображения, скачивание файлов, формулы, код и вкладки отображаются.
 3. `/authors` и `/paths` показывают перенесённые профили и маршруты, если они созданы.
 4. Защищённая статья требует пароль соответствующей категории.
@@ -267,6 +270,7 @@ nginx -T
 ```bash
 cd /opt/knowbase-md
 git status --short
+umask 022
 git fetch origin
 git switch master
 git pull --ff-only origin master

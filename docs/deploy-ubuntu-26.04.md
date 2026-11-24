@@ -1,4 +1,4 @@
-# Установка knowbase-md 2.0.0 на чистую Ubuntu 26.04
+# Установка knowbase-md 2.0.1 на чистую Ubuntu 26.04
 
 Инструкция рассчитана на **пустой сервер Ubuntu Server 26.04 LTS**, доступ по SSH и собственный домен. Команды на сервере выполняются от `root` в Bash. Для сервера с уже работающими сайтами не удаляйте их конфигурацию: используйте [инструкцию обновления существующей установки](site-guide.md).
 
@@ -39,7 +39,7 @@ python3 --version
 useradd --system --user-group --home-dir /opt/knowbase-md --shell /usr/sbin/nologin knowbase
 git clone --branch master https://github.com/vdnrobo/knowbase-md.git /opt/knowbase-md
 cd /opt/knowbase-md
-git checkout --detach v2.0.0
+git checkout --detach v2.0.1
 
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
@@ -48,7 +48,7 @@ install -d -o root -g knowbase -m 750 articles authors learning-paths
 install -d -o knowbase -g knowbase -m 750 data
 ```
 
-Ветка проекта называется `master`. Переключение на тег `v2.0.0` устанавливает именно этот релиз; detached HEAD здесь ожидаем. Код и виртуальное окружение остаются принадлежащими `root`, пользователь `knowbase` получает право записи только в данные приложения.
+Ветка проекта называется `master`. Переключение на тег `v2.0.1` устанавливает именно этот релиз; detached HEAD здесь ожидаем. Код и виртуальное окружение остаются принадлежащими `root`, пользователь `knowbase` получает право записи только в данные приложения.
 
 Nginx устанавливается из репозитория Ubuntu. Официальное руководство: [установка Nginx](https://ubuntu.com/server/docs/how-to/web-services/install-nginx/).
 
@@ -251,7 +251,7 @@ nginx -T
 
 Откройте `https://ваш-домен/` и проверьте:
 
-1. Главная показывает перенесённые категории, в футере стоит `v2.0.0`.
+1. Главная показывает перенесённые категории, в футере стоит `v2.0.1`.
 2. Изображения, скачивание файлов, формулы, код и вкладки отображаются.
 3. `/authors` и `/paths` показывают перенесённые профили и маршруты, если они созданы.
 4. Защищённая статья требует пароль соответствующей категории.

@@ -6,6 +6,46 @@
     box-sizing: border-box;
 }
 
+.page-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: var(--page-bg);
+    color: var(--muted);
+    font-size: 16px;
+    cursor: progress;
+}
+
+.page-loading[hidden] {
+    display: none;
+}
+
+.page-loading-spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: page-loading-spin 0.9s linear infinite;
+}
+
+@keyframes page-loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-loading-spinner { animation: none; }
+}
+
+@media print {
+    .page-loading { display: none; }
+}
+
 :root {
     color-scheme: light;
     --page-bg: #f5f7ff;

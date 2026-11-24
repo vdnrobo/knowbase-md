@@ -1,4 +1,3 @@
-import base64
 import json
 from pathlib import Path
 import re
@@ -88,15 +87,18 @@ class ThemeMarkupTests(unittest.TestCase):
         self.assertEqual(width, height)
         self.assertIn(data[25], (4, 6))
 
-    def test_robo_pattern_preserves_the_original_favicon(self):
+    def test_robo_pattern_is_vector_art_from_the_reference(self):
         root = ET.parse('static/themes/robo548.svg').getroot()
-        image = root.find('{http://www.w3.org/2000/svg}image')
-        self.assertIsNotNone(image)
-        prefix, encoded = image.get('href').split(',', 1)
-        self.assertEqual(prefix, 'data:image/x-icon;base64')
-        self.assertEqual(base64.b64decode(encoded), Path('favicon.ico').read_bytes())
-        self.assertEqual(image.get('x'), '352')
-        self.assertEqual(image.get('y'), '352')
+        namespace = {'svg': 'http://www.w3.org/2000/svg'}
+        self.assertEqual(root.get('viewBox'), '0 0 1024 1024')
+        self.assertEqual(root.findall('.//svg:image', namespace), [])
+        mark = root.find('svg:g', namespace)
+        self.assertEqual(mark.get('transform'), 'translate(352 352) scale(0.32)')
+        self.assertEqual(mark.get('fill'), 'none')
+        self.assertEqual(mark.get('stroke'), '#5673db')
+        self.assertEqual(len(mark.findall('svg:use', namespace)), 8)
+        self.assertEqual(len(mark.findall('svg:circle', namespace)), 3)
+        self.assertEqual(mark.find('svg:circle[@stroke]', namespace).get('stroke'), '#000070')
 
     def test_each_decorated_theme_has_a_transparent_corner_illustration(self):
         css = Path('static/style.css').read_text(encoding='utf-8')

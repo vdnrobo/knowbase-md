@@ -23,12 +23,12 @@
     "summer": "Single centered motif; two CSS layers offset by half a 256px tile (216px on mobile) form diagonal rows.",
     "autumn": "Single centered motif; two CSS layers offset by half a 256px tile (216px on mobile) form diagonal rows.",
     "hello-kitty": "One butterfly centered in a transparent tile, two CSS layers form diagonal rows; 256px desktop, 224px mobile.",
-    "robo548": "SVG tile embeds the original favicon.ico byte-for-byte, centered at 320x320 within a 1024x1024 canvas. No generated or modified logo."
+    "robo548": "Native vector redraw of the user's reference: eight-tooth blue gear, small circular eye, dark blue inner ring and three curved finger lines. Motif remains centered at 320x320 within the transparent 1024x1024 tile. The actual favicon.ico is unchanged."
   },
   "references": {
     "minions": "User-attached photograph of Bob's teddy bear with button eyes, black nose and pink tongue; packaging omitted.",
     "548": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSo2GAmB09KyUVXevILCh8V38iQt3LWmGL9izBWzBha8g&s",
-    "robo548": "../../favicon.ico",
+    "robo548": "User-attached two-blue gear emblem, redrawn as native SVG paths and circles.",
     "67-character": "User-attached white character with propeller hat and rainbow lollipop."
   }
 }

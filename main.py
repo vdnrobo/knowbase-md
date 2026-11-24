@@ -14,6 +14,9 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 from xml.etree import ElementTree
 
 import markdown
+import feedback
+import knowledge
+import learning_paths
 from markdown.extensions import Extension
 from markdown.postprocessors import Postprocessor
 from markdown.preprocessors import Preprocessor
@@ -64,7 +67,20 @@ ARTICLES_DIR = "./articles"
 STATIC_DIR = "./static"
 ANNOUNCEMENT_FILE = "./announcement.md"
 FAVICON_FILE = "./favicon.ico"
-SITE_VERSION = "1.7.0"
+SITE_VERSION = "2.0.0"
+SITE_THEMES = (
+    ("classic", "Классическая"),
+    ("winter", "Зимняя"),
+    ("spring", "Весенняя"),
+    ("summer", "Летняя"),
+    ("autumn", "Осенняя"),
+    ("67", "67"),
+    ("magic", "Волшебная"),
+    ("hello-kitty", "Hello Kitty"),
+    ("548", "548"),
+    ("robo548", "Robo548"),
+    ("minions", "Миньоны"),
+)
 ACTIVITY_DB_PATH = os.path.join(os.environ.get("DATA_DIR", "./data"), "activity.sqlite3")
 VISITOR_COOKIE_NAME = "site_visitor"
 VISITOR_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
@@ -78,6 +94,7 @@ PASSWORD_ENV_PREFIX = "ARTICLE_PASSWORD_"
 AUTH_COOKIE_PREFIX = "article_auth_"
 MAX_FORM_BYTES = 4096
 AUTHORS_DIR = "./authors"
+LEARNING_PATHS_DIR = "./learning-paths"
 MEDIA_EXTENSIONS = {
     ".avif",
     ".gif",
@@ -268,7 +285,53 @@ def render_site_footer():
     return f"""
         <footer class="site-footer">
             {html.escape(FOOTER_TEXT)} · <a href="{GITHUB_URL}" target="_blank" rel="noopener">GitHub</a>
+            · <a href="/bookmarks">Закладки</a> · <a href="/updates">Обновления</a>
+            · <a href="/paths">Учебные маршруты</a>
         </footer>
+        <script src="/static/vendor/marked.umd.js" defer></script>
+        <script src="/static/vendor/purify.min.js" defer></script>
+        <script src="/static/quiz.js" defer></script>
+        <script src="/static/teaching.js" defer></script>
+        <script src="/static/reader.js" defer></script>
+    """
+
+
+def render_theme_switcher():
+    options = "".join(
+        f'<option value="{value}">{label}</option>'
+        for value, label in SITE_THEMES
+    )
+    return f"""
+        <div class="season-background" aria-hidden="true">
+            <span class="season-background-secondary"></span>
+        </div>
+        <div class="page-actions">
+        <a class="utility-icon-link" href="/bookmarks" title="Закладки" aria-label="Закладки"><img src="/static/icons/bookmark.svg" alt="" width="20" height="20"></a>
+        <label class="theme-switcher" hidden>
+            <span>Тема</span>
+            <select id="site-theme" data-theme-select>{options}</select>
+        </label>
+        <label class="color-mode-switch" hidden title="Тёмный режим">
+            <input type="checkbox" role="switch" data-color-mode-switch aria-label="Тёмный режим">
+            <span class="color-mode-track" aria-hidden="true">
+                <span class="color-mode-thumb"></span>
+                <img src="/static/icons/sun.svg" alt="" width="18" height="18">
+                <img src="/static/icons/moon.svg" alt="" width="18" height="18">
+            </span>
+        </label>
+        </div>
+    """
+
+
+def render_page_header(url="/", label="VDN на Robo548", aria_label="На главную"):
+    return f"""
+        <header class="site-toolbar">
+            <a class="page-mark" href="{html.escape(url)}" aria-label="{html.escape(aria_label)}">
+                <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
+                <span>{html.escape(label)}</span>
+            </a>
+            {render_theme_switcher()}
+        </header>
     """
 
 
@@ -330,6 +393,14 @@ def parse_article_metadata(content):
             body = body[comment_end + 3:].lstrip()
             continue
 
+        extra_match = re.fullmatch(r'(requires|related|next|updated|update-note)\s*:\s*([\s\S]*)', comment, re.IGNORECASE)
+        if extra_match:
+            field, value = extra_match.groups()
+            field = field.lower().replace('-', '_')
+            metadata[field] = [item.strip() for item in value.split(',') if item.strip()] if field in knowledge.RELATIONS else value.strip()
+            body = body[comment_end + 3:].lstrip()
+            continue
+
         break
 
     return metadata, body
@@ -378,20 +449,38 @@ def count_toc_items(tokens):
     return total
 
 
-def render_markdown(content):
-    md = markdown.Markdown(
-        extensions=["extra", "toc", FigureImageExtension(), MathPreserveExtension()],
+def create_markdown_renderer(glossary=None, heading_links=False, extra_extensions=()):
+    extensions = ["footnotes", "attr_list", "def_list", "tables", "abbr", "md_in_html", "toc", "admonition", "pymdownx.superfences", "pymdownx.tabbed",
+                  FigureImageExtension(), MathPreserveExtension(), knowledge.KnowledgeExtension(glossary), knowledge.TeachingBlocksExtension()]
+    if heading_links:
+        extensions.append(knowledge.HeadingLinksExtension())
+    extensions.extend(extra_extensions)
+    return markdown.Markdown(
+        extensions=extensions,
         extension_configs={
             "toc": {
                 "toc_depth": "1-6",
                 "permalink": False,
             },
+            "pymdownx.tabbed": {"alternate_style": True},
+            "pymdownx.superfences": {"custom_fences": [{"name": "*", "class": "", "format": knowledge.format_fenced_code}]},
         },
         output_format="html5",
     )
+
+
+def render_markdown(content, glossary=None, heading_links=False, extra_extensions=()):
+    md = create_markdown_renderer(glossary, heading_links, extra_extensions)
     content_html = md.convert(content)
     toc_html = md.toc if count_toc_items(md.toc_tokens) else ""
     return content_html, toc_html
+
+
+def load_learning_paths(articles):
+    glossary = knowledge.load_glossary(ARTICLES_DIR)
+    def render(content, **kwargs):
+        return render_markdown(content, glossary, **kwargs)
+    return learning_paths.load_paths(LEARNING_PATHS_DIR, articles, render)
 
 
 def render_description_markdown(content):
@@ -629,6 +718,53 @@ def render_author_photo(author, class_name):
         initials = "?"
 
     return f'<div class="{class_name} author-photo-placeholder">{html.escape(initials)}</div>'
+
+
+def render_home_authors(authors):
+    people = sort_authors(authors)
+    if not people:
+        return ""
+
+    slides = ""
+    for index, author in enumerate(people, start=1):
+        description = author["description_html"] or "<p>Описание пока не добавлено.</p>"
+        slides += f"""
+            <article class="home-author-slide" role="group" aria-roledescription="слайд" aria-label="{index} из {len(people)}">
+                {render_author_photo(author, "home-author-photo")}
+                <div class="home-author-body">
+                    <h3 class="home-author-name">
+                        <a class="home-author-link" href="{html.escape(author["url"])}">{html.escape(author["title"])}</a>
+                    </h3>
+                    <div class="home-author-description author-description">{description}</div>
+                </div>
+            </article>
+        """
+
+    controls = ""
+    if len(people) > 1:
+        controls = f"""
+            <div class="home-authors-controls" data-author-controls hidden>
+                <button class="home-authors-arrow" type="button" data-author-previous aria-label="Предыдущий автор" title="Предыдущий автор" aria-controls="home-author-list">
+                    <img src="/static/icons/chevron-left.svg" alt="" width="20" height="20">
+                </button>
+                <span class="home-authors-position" data-author-position role="status" aria-live="polite" aria-atomic="true">1 / {len(people)}</span>
+                <button class="home-authors-arrow" type="button" data-author-next aria-label="Следующий автор" title="Следующий автор" aria-controls="home-author-list">
+                    <img src="/static/icons/chevron-right.svg" alt="" width="20" height="20">
+                </button>
+            </div>
+        """
+
+    return f"""
+        <section class="home-authors" aria-labelledby="home-authors-title" data-author-carousel>
+            <div class="home-authors-header">
+                <h2 id="home-authors-title">Авторы</h2>
+                {controls}
+            </div>
+            <div class="home-author-list" id="home-author-list">
+                {slides}
+            </div>
+        </section>
+    """
 
 
 def render_article_list_item(article, protected=False, show_authors=False):
@@ -952,7 +1088,7 @@ def get_recent_articles(articles, limit=5):
     ]
 
 
-def render_home_sidebar(visitor_count, recent_articles):
+def render_home_sidebar(visitor_count, recent_articles, articles=None):
     count = str(visitor_count) if visitor_count is not None else "—"
     recent_items = ""
     for article, timestamp in recent_articles or []:
@@ -982,6 +1118,10 @@ def render_home_sidebar(visitor_count, recent_articles):
                 <h2 id="recent-articles-title">Новые статьи</h2>
                 {recent_content}
             </section>
+            <section class="home-recent" aria-labelledby="updated-articles-title">
+                <h2 id="updated-articles-title"><a href="/updates">Обновления</a></h2>
+                {knowledge.render_updates(articles or {}, limit=5)}
+            </section>
         </aside>
     """
 
@@ -990,6 +1130,10 @@ def load_content():
     categories = []
     articles_by_url = {}
     authors = load_authors()
+    glossary = knowledge.load_glossary(ARTICLES_DIR)
+
+    if not os.path.isdir(ARTICLES_DIR):
+        return categories, articles_by_url, authors
 
     for category_slug in sorted(os.listdir(ARTICLES_DIR)):
         category_dir = os.path.join(ARTICLES_DIR, category_slug)
@@ -1041,7 +1185,7 @@ def load_content():
             contributor_search_text = " ".join(
                 author["title"] for author in article_authors + article_editors
             )
-            content_html, toc_html = render_markdown(content)
+            content_html, toc_html = render_markdown(content, glossary, heading_links=True)
             article_title = get_article_title(content, article_slug)
             search_content = article_title if metadata["protected"] else content
             url = f"/{quote(category_slug)}/{quote(article_slug)}"
@@ -1057,6 +1201,12 @@ def load_content():
                 "number": parse_article_number(article_slug),
                 "authors": article_authors,
                 "editors": article_editors,
+                "updated": knowledge.valid_date(metadata.get("updated")),
+                "update_note": metadata.get("update_note", ""),
+                "requires": metadata.get("requires", []),
+                "related": metadata.get("related", []),
+                "next": metadata.get("next", []),
+                "source_path": article_path,
             }
 
             category["articles"].append(article)
@@ -1073,8 +1223,25 @@ def load_content():
     return categories, articles_by_url, authors
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(feedback.FeedbackMixin, BaseHTTPRequestHandler):
+    def feedback_database_path(self):
+        return os.path.join(os.path.dirname(os.path.abspath(ACTIVITY_DB_PATH)), "feedback.sqlite3")
+
+    def render_utility_page(self, title, body, status=200, headers=None):
+        self.send_html(f'''<!DOCTYPE html><html lang="ru"><head>
+            <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{html.escape(title)} — База знаний</title>
+            <link rel="icon" href="/favicon.ico" type="image/x-icon">
+            <script src="/static/theme.js"></script><link rel="stylesheet" href="/static/style.css">
+            <script src="/static/site.js" defer></script></head><body>
+            <div class="container">{render_page_header()}<main><h1>{html.escape(title)}</h1>{body}</main>{render_site_footer()}</div>
+            </body></html>''', status, headers)
+
     def end_headers(self):
+        feedback_cookie = getattr(self, "feedback_cookie", None)
+        if feedback_cookie:
+            self.send_header("Set-Cookie", feedback_cookie)
+            self.feedback_cookie = None
         visitor_cookie = getattr(self, "visitor_cookie", None)
         if visitor_cookie:
             self.send_header("Set-Cookie", visitor_cookie)
@@ -1159,7 +1326,7 @@ class Handler(BaseHTTPRequestHandler):
         site_footer = render_site_footer()
         escaped_title = html.escape(article["title"])
         escaped_category = html.escape(category["title"])
-        action = html.escape(article["url"])
+        action = html.escape(learning_paths.article_request_url(self.path, article, getattr(self, 'learning_paths', {})))
 
         error_html = ""
         if error:
@@ -1173,15 +1340,13 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Доступ ограничен — {escaped_title}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <script src="/static/theme.js"></script>
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
             <body>
                 <div class="container auth-container">
-                    <a class="page-mark" href="/" aria-label="На главную">
-                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                        <span>VDN на Robo548</span>
-                    </a>
+                    {render_page_header()}
                     <main class="auth-card">
                         <p class="auth-kicker">Закрытая статья</p>
                         <h1>{escaped_title}</h1>
@@ -1210,6 +1375,14 @@ class Handler(BaseHTTPRequestHandler):
         self.is_content_page = False
         path = urlparse(self.path).path
         categories, articles, authors = load_content()
+        self.learning_paths, _ = load_learning_paths(articles)
+
+        if path == "/admin/feedback":
+            self.handle_feedback_admin("POST")
+            return
+        if path.endswith("/feedback") and path[:-len("/feedback")] in articles:
+            self.handle_article_feedback(articles[path[:-len("/feedback")]])
+            return
 
         if path not in articles or not articles[path]["protected"]:
             self.send_response(404)
@@ -1243,7 +1416,7 @@ class Handler(BaseHTTPRequestHandler):
             cookie_path = f"/{quote(category['slug'])}"
 
             self.send_response(303)
-            self.send_header("Location", article["url"])
+            self.send_header("Location", learning_paths.article_request_url(self.path, article, self.learning_paths))
             self.send_header(
                 "Set-Cookie",
                 f"{cookie_name}={token}; Path={cookie_path}; HttpOnly; SameSite=Lax",
@@ -1261,6 +1434,27 @@ class Handler(BaseHTTPRequestHandler):
         self.visitor_cookie = None
         self.is_content_page = False
         path = urlparse(self.path).path
+
+        if path == "/admin/feedback":
+            self.handle_feedback_admin()
+            return
+
+        if re.match(r"^/[^/]+/files(?:/|$)", unquote(path)):
+            attachment = knowledge.attachment_path(ARTICLES_DIR, path)
+            if attachment:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Disposition", "attachment; filename=\"download\"; filename*=UTF-8''" + quote(attachment.name, safe=""))
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Length", str(attachment.stat().st_size))
+                self.end_headers()
+                with open(attachment, "rb") as source:
+                    while chunk := source.read(65536):
+                        self.wfile.write(chunk)
+            else:
+                self.send_response(404)
+                self.end_headers()
+            return
 
         if path == "/favicon.ico" and os.path.isfile(FAVICON_FILE):
             self.send_file(FAVICON_FILE, "image/x-icon")
@@ -1289,6 +1483,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         categories, articles, authors = load_content()
+        paths, _ = load_learning_paths(articles)
+        self.learning_paths = paths
+        path_page = next((route for route in paths.values() if route['url'] == path), None)
 
         category_page = next(
             (category for category in categories if category["url"] == path),
@@ -1296,7 +1493,7 @@ class Handler(BaseHTTPRequestHandler):
         )
         if path == "/":
             self.is_content_page = True
-        elif path == "/authors" or path in articles or category_page is not None:
+        elif path in ("/authors", "/bookmarks", "/updates", "/paths") or path in articles or category_page is not None or path_page is not None:
             self.is_content_page = True
         elif path.startswith("/authors/"):
             parts = [unquote(part) for part in path.strip("/").split("/") if part]
@@ -1309,6 +1506,23 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, sqlite3.Error) as error:
                 self.log_error("Cannot update visitor statistics: %s", error)
 
+        if path == "/bookmarks":
+            self.render_utility_page("Закладки", '<p data-bookmarks-empty role="status">Закладок пока нет.</p><ul class="bookmark-list" data-bookmark-list></ul><noscript><p>Закладки недоступны без JavaScript.</p></noscript>' + knowledge.catalog_html(articles))
+            return
+        if path == "/updates":
+            self.render_utility_page("Обновления", knowledge.render_updates(articles))
+            return
+        if path == "/paths":
+            self.render_utility_page("Учебные маршруты", learning_paths.render_path_list(paths))
+            return
+        if path_page is not None:
+            first_step = learning_paths.step_url(path_page['steps'][0], path_page)
+            body = '<p><a href="/paths">Все маршруты</a></p>'
+            body += f'<p><a class="primary-link" href="{html.escape(first_step)}">Начать маршрут</a></p>'
+            body += '<div class="learning-path-body">' + path_page['content'] + '</div>'
+            self.render_utility_page(path_page['title'], body)
+            return
+
         # --- MAIN PAGE ---
         if path == "/":
             try:
@@ -1316,7 +1530,7 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, sqlite3.Error) as error:
                 self.log_error("Cannot load recent articles: %s", error)
                 recent_articles = None
-            sidebar = render_home_sidebar(visitor_count, recent_articles)
+            sidebar = render_home_sidebar(visitor_count, recent_articles, articles)
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
             self.end_headers()
@@ -1324,7 +1538,7 @@ class Handler(BaseHTTPRequestHandler):
             announcement = load_announcement()
             site_footer = render_site_footer()
             category_blocks = ""
-            home_authors = ""
+            home_authors = render_home_authors(authors)
             for category in categories:
                 description = ""
                 if category["description"]:
@@ -1353,25 +1567,6 @@ class Handler(BaseHTTPRequestHandler):
                     </details>
                 """
 
-            home_author_items = ""
-            for author in sort_authors(authors):
-                home_author_items += f"""
-                    <a class="home-author-link" href="{author["url"]}">
-                        {render_author_photo(author, "home-author-photo")}
-                        <span>{html.escape(author["title"])}</span>
-                    </a>
-                """
-
-            if home_author_items:
-                home_authors = f"""
-                    <section class="home-authors" aria-labelledby="home-authors-title">
-                        <h2 id="home-authors-title">Авторы</h2>
-                        <div class="home-author-list">
-                            {home_author_items}
-                        </div>
-                    </section>
-                """
-
             self.wfile.write(f"""
             <!DOCTYPE html>
             <html lang="ru">
@@ -1380,6 +1575,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>vdn@robo548</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <script src="/static/theme.js"></script>
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
@@ -1387,18 +1583,26 @@ class Handler(BaseHTTPRequestHandler):
                 <div class="home-layout">
                 <main class="container home-content">
                     <header class="site-brand">
-                        <img class="site-brand-icon" src="/static/site-icon.svg" alt="" width="48" height="48">
-                        <div>
-                            <p class="site-brand-kicker">VDN на Robo548</p>
-                            <h1>База знаний</h1>
+                        <div class="site-brand-main">
+                            <img class="site-brand-icon" src="/static/site-icon.svg" alt="" width="48" height="48">
+                            <div>
+                                <p class="site-brand-kicker">VDN на Robo548</p>
+                                <h1>База знаний</h1>
+                            </div>
                         </div>
+                        {render_theme_switcher()}
                     </header>
                     {announcement}
+                    <section class="continue-reading" data-continue-reading hidden>
+                        <h2>Продолжить чтение</h2><a data-continue-link href="/">Статья</a>
+                    </section>
+                    {knowledge.catalog_html(articles)}
                     <div class="search-box">
                         <label for="site-search">Поиск</label>
                         <input id="site-search" type="search" placeholder="Название, категория или текст статьи">
                     </div>
                     <p id="no-results" class="no-results" hidden>Ничего не найдено.</p>
+                    {learning_paths.render_path_list(paths, home=True)}
                     {category_blocks}
                     {home_authors}
                     {site_footer}
@@ -1428,15 +1632,13 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(category["title"])} — База знаний</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <script src="/static/theme.js"></script>
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
             <body class="category-page">
                 <div class="container">
-                    <a class="page-mark" href="/" aria-label="На главную">
-                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                        <span>VDN на Robo548</span>
-                    </a>
+                    {render_page_header()}
                     <main>
                         <header class="category-page-header">
                             <h1>{html.escape(category["title"])}</h1>
@@ -1490,15 +1692,13 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>Авторы</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <script src="/static/theme.js"></script>
                 <link rel="stylesheet" href="/static/style.css">
                 <script src="/static/site.js" defer></script>
             </head>
             <body>
                 <div class="container">
-                    <a class="page-mark" href="/" aria-label="На главную">
-                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                        <span>VDN на Robo548</span>
-                    </a>
+                    {render_page_header()}
                     <main>
                         <h1>Авторы</h1>
                         <div class="author-grid">
@@ -1524,15 +1724,13 @@ class Handler(BaseHTTPRequestHandler):
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Автор не найден</title>
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                    <script src="/static/theme.js"></script>
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
                 </head>
                 <body>
                     <div class="container not-found">
-                        <a class="page-mark" href="/" aria-label="На главную">
-                            <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                            <span>VDN · Robo548</span>
-                        </a>
+                        {render_page_header(label="VDN · Robo548")}
                         <p class="not-found-code">404</p>
                         <h1>Автор не найден</h1>
                         <p class="not-found-text">Такой автор пока не добавлен.</p>
@@ -1561,15 +1759,13 @@ class Handler(BaseHTTPRequestHandler):
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>{html.escape(author["title"])}</title>
                     <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                    <script src="/static/theme.js"></script>
                     <link rel="stylesheet" href="/static/style.css">
                     <script src="/static/site.js" defer></script>
                 </head>
                 <body>
                     <div class="container">
-                        <a class="page-mark" href="/authors" aria-label="К списку авторов">
-                            <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                            <span>Авторы</span>
-                        </a>
+                        {render_page_header("/authors", "Авторы", "К списку авторов")}
                         <main>
                             <section class="author-profile">
                                 {render_author_photo(author, "author-profile-photo")}
@@ -1605,6 +1801,13 @@ class Handler(BaseHTTPRequestHandler):
             article_index = category["articles"].index(article)
             article_authors = render_article_authors(article, "article-page-authors")
             article_editors = render_article_editors(article)
+            article_tools = knowledge.article_tools(article)
+            article_prerequisites = knowledge.render_relations(article, articles, fields=('requires',))
+            article_relations = knowledge.render_relations(article, articles, fields=('related', 'next'))
+            article_feedback = self.render_article_feedback(article)
+            active_path = learning_paths.active_path(self.path, article, paths)
+            article_paths = learning_paths.render_article_paths(article, paths, active_path)
+            route_slug = active_path['slug'] if active_path else ''
             previous_article = (
                 category["articles"][article_index - 1] if article_index > 0 else None
             )
@@ -1664,6 +1867,7 @@ class Handler(BaseHTTPRequestHandler):
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>{html.escape(article["title"])}</title>
                 <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+                <script src="/static/theme.js"></script>
                 <link rel="stylesheet" href="/static/style.css">
                 <script>
                     window.MathJax = {{
@@ -1683,10 +1887,7 @@ class Handler(BaseHTTPRequestHandler):
             </head>
             <body class="article-page">
                 <div class="container article-container">
-                    <a class="page-mark" href="/" aria-label="На главную">
-                        <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                        <span>VDN на Robo548</span>
-                    </a>
+                    {render_page_header()}
                     <div class="article-layout">
                         {toc}
                         <main class="article-main">
@@ -1695,9 +1896,14 @@ class Handler(BaseHTTPRequestHandler):
                             </nav>
                             {article_authors}
                             {article_editors}
-                            <article class="article-body">
+                            {article_tools}
+                            {article_prerequisites}
+                            {article_paths}
+                            <article class="article-body" data-article-url="{html.escape(article['url'])}" data-article-title="{html.escape(article['title'])}" data-article-category="{html.escape(category['title'])}" data-learning-route="{html.escape(route_slug)}">
                                 {article["content"]}
                             </article>
+                            {article_relations}
+                            {article_feedback}
                         </main>
                     </div>
                     {site_footer}
@@ -1740,6 +1946,7 @@ class Handler(BaseHTTPRequestHandler):
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>404 — Робот потерял страницу</title>
             <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any">
+            <script src="/static/theme.js"></script>
             <link rel="stylesheet" href="/static/style.css">
             <script src="/static/site.js" defer></script>
         </head>
@@ -1747,10 +1954,7 @@ class Handler(BaseHTTPRequestHandler):
 
         <div class="container not-found">
 
-            <a class="page-mark" href="/" aria-label="На главную">
-                <img class="page-mark-icon" src="/static/site-icon.svg" alt="" width="32" height="32">
-                <span>VDN · Robo548</span>
-            </a>
+            {render_page_header(label="VDN · Robo548")}
 
             <div class="robot">
                 🤖

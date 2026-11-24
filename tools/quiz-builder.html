@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Самопроверка — генератор</title>
+    <link rel="stylesheet" href="../static/style.css">
+    <style>
+        .builder-container {width:min(1120px,calc(100% - 24px));max-width:1120px;}
+        .builder-header {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+        .builder-header h1 {font-size:1.5rem;margin:0;}
+        .builder-layout {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;margin-top:24px;}
+        .quiz-builder label {display:grid;gap:6px;margin-bottom:14px;min-width:0;}
+        .builder-type {min-width:180px;}
+        .builder-option {display:grid;grid-template-columns:32px minmax(0,1fr) 44px;align-items:center;gap:8px;margin-bottom:10px;}
+        .builder-option input[type=radio] {width:20px;height:20px;accent-color:var(--accent);}
+        .builder-actions {display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
+        #output {font-family:Consolas,monospace;font-size:.85rem;resize:vertical;}
+        .builder-preview {border-top:1px solid var(--border);margin-top:20px;}
+        .builder-preview h2 {font-size:1.1rem;}
+        #builder-status {min-height:24px;color:var(--danger);}
+        @media(max-width:800px){.builder-layout{grid-template-columns:minmax(0,1fr);}.builder-container{padding:18px;}}
+    </style>
+    <script src="../static/vendor/marked.umd.js" defer></script>
+    <script src="../static/vendor/purify.min.js" defer></script>
+    <script src="../static/quiz.js" defer></script>
+    <script src="quiz-builder.js" defer></script>
+</head>
+<body>
+<main class="container builder-container quiz-builder">
+    <header class="builder-header"><h1>Самопроверка</h1><label class="builder-type">Тип задания<select id="type"><option value="choice">Выбор ответа</option><option value="exercise">Открытое задание</option></select></label></header>
+    <div class="builder-layout">
+        <section aria-label="Задание">
+            <label>Вопрос (Markdown)<textarea id="question" rows="4" maxlength="16000" required></textarea></label>
+            <fieldset id="choices"><legend>Варианты ответа</legend><div id="options"></div><button type="button" id="add-option" class="reader-command"><img class="ui-icon" src="../static/icons/plus.svg" alt="">Добавить вариант</button></fieldset>
+            <label>Подсказка (Markdown)<textarea id="hint" rows="3" maxlength="16000"></textarea></label>
+            <label>Ответ или объяснение (Markdown)<textarea id="answer" rows="5" maxlength="16000"></textarea></label>
+        </section>
+        <section aria-label="Результат">
+            <label>Markdown<textarea id="output" rows="16" readonly spellcheck="false"></textarea></label>
+            <div class="builder-actions">
+                <button type="button" id="copy" class="reader-command"><img class="ui-icon" src="../static/icons/copy.svg" alt="">Копировать</button>
+                <button type="button" id="download" class="reader-command"><img class="ui-icon" src="../static/icons/download.svg" alt="">Скачать .md</button>
+            </div>
+            <p id="builder-status" role="status"></p>
+            <details><summary>Импорт</summary><label>Блок quiz<textarea id="import" rows="6"></textarea></label><button type="button" id="load" class="reader-command">Открыть блок</button></details>
+            <section class="builder-preview"><h2>Предпросмотр</h2><div id="preview"></div></section>
+        </section>
+    </div>
+</main>
+</body>
+</html>

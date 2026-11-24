@@ -3,11 +3,68 @@ document.addEventListener("DOMContentLoaded", () => {
         window.hljs.highlightAll();
     }
 
+    document.querySelectorAll("[data-author-carousel]").forEach((carousel) => {
+        const list = carousel.querySelector(".home-author-list");
+        const slides = Array.from(carousel.querySelectorAll(".home-author-slide"));
+        const controls = carousel.querySelector("[data-author-controls]");
+        const previous = carousel.querySelector("[data-author-previous]");
+        const next = carousel.querySelector("[data-author-next]");
+        const position = carousel.querySelector("[data-author-position]");
+        if (!list || !slides.length) {
+            return;
+        }
+
+        let current = 0;
+        const showAuthor = (index) => {
+            const moveFocus = slides.some((slide) => slide.contains(document.activeElement));
+            current = (index + slides.length) % slides.length;
+            slides.forEach((slide, slideIndex) => {
+                const active = slideIndex === current;
+                slide.setAttribute("aria-hidden", String(!active));
+                slide.inert = !active;
+            });
+            if (position) {
+                position.textContent = `${current + 1} / ${slides.length}`;
+            }
+            if (moveFocus) {
+                slides[current].querySelector(".home-author-link").focus({ preventScroll: true });
+            }
+        };
+
+        list.classList.add("is-carousel");
+        carousel.setAttribute("aria-roledescription", "карусель");
+        showAuthor(0);
+        if (controls) {
+            controls.hidden = slides.length < 2;
+        }
+        if (previous) {
+            previous.addEventListener("click", () => showAuthor(current - 1));
+        }
+        if (next) {
+            next.addEventListener("click", () => showAuthor(current + 1));
+        }
+        carousel.addEventListener("keydown", (event) => {
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+                || event.target.closest("input, textarea, select, [contenteditable]")) {
+                return;
+            }
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                event.preventDefault();
+                showAuthor(current + (event.key === "ArrowRight" ? 1 : -1));
+            }
+        });
+    });
+
     const tocPanel = document.querySelector("[data-toc-panel]");
     if (tocPanel) {
         const tocToggle = tocPanel.querySelector(".toc-toggle");
         const tocNav = tocPanel.querySelector(".toc");
-        const savedState = localStorage.getItem("tocCollapsed");
+        let savedState = null;
+        try {
+            savedState = localStorage.getItem("tocCollapsed");
+        } catch {
+            // Use the default TOC state if browser storage is unavailable.
+        }
 
         const setTocCollapsed = (collapsed) => {
             tocPanel.classList.toggle("is-collapsed", collapsed);
@@ -29,7 +86,11 @@ document.addEventListener("DOMContentLoaded", () => {
             tocToggle.addEventListener("click", () => {
                 const collapsed = !tocPanel.classList.contains("is-collapsed");
                 setTocCollapsed(collapsed);
-                localStorage.setItem("tocCollapsed", String(collapsed));
+                try {
+                    localStorage.setItem("tocCollapsed", String(collapsed));
+                } catch {
+                    // The toggle remains usable without saving its state.
+                }
             });
         }
 

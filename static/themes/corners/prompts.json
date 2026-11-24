@@ -1,0 +1,149 @@
+{
+  "tool": "image_gen",
+  "transparent_background": true,
+  "local_processing": {
+    "minions": "Source: user-provided photo_2026-11-24_08-54-32.jpg. With explicit user approval, removed only edge-connected near-white pixels (minimum RGB 220, channel spread at most 35) using a local four-neighbor flood fill. Retained original colors, crayon texture and enclosed opaque white eye rings. No generative redraw. Bounds recorded from the resulting alpha silhouette."
+  },
+  "revisions": {
+    "2026-11-24": {
+      "548": "Edit target: the existing director figurine in the attached local reference. Redraw the SAME full-body figurine in a MUCH SIMPLER, lighter, flat 2D cartoon style. Identity and pose invariants: older bald man with gray eyebrows and a small gray mustache, oversized rounded-square collectible-figure head, simple black eyes; white shirt, light blue tie, navy trousers, black shoes; one hand in trouser pocket, other hand holding a dark jacket over his shoulder, watch on that wrist. Keep exact relaxed pose and friendly neutral expression. Make ALL contours very thin and delicate, about one quarter of current heavy outline width. Use flat opaque colors, only a few small purposeful internal lines. Remove wrinkles, dense eyebrow and mustache texture, shiny eyes and every 3D shading gradient. Crucially REMOVE ALL colored hazy glow outside the silhouette: background must be genuinely alpha=0 everywhere outside the man, no shadow or halos. Fully opaque white shirt and skin. Whole head and shoes visible, near-tight portrait composition with a small transparent safety margin. No props beyond the existing jacket and watch, no text, no packaging, no thick border, no checkerboard.",
+      "robo548": "Edit target: the Arduino Nano image supplied as the local reference. Redraw the SAME classic Arduino Nano board as a simplified flat 2D cartoon, not a photographic or 3D illustration. Preserve the narrow blue board, silver mini-USB socket at TOP, central square dark chip, two rows of gold pins, small reset button, whole portrait orientation and gentle existing lean. All outline strokes must be thin delicate charcoal gray about one quarter of their current thickness. Simplify components into friendly rounded rectangles and a few clean lines. PCB is one flat medium-blue region, metal is flat light gray, pins flat muted gold. No shine, gradients, bevels, surface texture, intricate traces or dense pin lettering. No face or anthropomorphic limbs. Crucially remove ALL diffuse haze around the board: genuinely alpha=0 outside the exact board and pins, no glow, shadow or colored blur. Whole USB socket and all pins visible, near-tight portrait framing with a small transparent margin. Clean flat cartoon icon illustration suitable for a minimal website corner, full opaque board on transparent background, no other objects, no text, no thick sticker border, no checkerboard."
+    }
+  },
+  "prompts": {
+    "67": "Edit target: minimalist wooden Tung Tung Sahur figure. Change ONLY the two dot eyes into small natural-looking eyes: modest horizontal almond shapes, opaque off-white sclera, brown irises, small dark pupils, fine upper eyelid lines, no exaggerated highlights. Eyes should be about 8 percent of wooden body's width each, not oversized. Keep every existing fine outline, wooden-log body shape, arms, legs, simple smile and bat pose. Also REMOVE all diffuse color outside the silhouette: absolutely clean alpha=0 outside figure with no brown halo, ambient blur or drop shadow. Subject is flat opaque honey brown with two fine wood lines, no shading or gradients. True transparent background, thin delicate contour illustration, full body portrait tightly framed. No new objects, text, extra expressions or checkerboard.",
+    "548": "Use case: stylized-concept. Input photo is an identity and clothing/pose reference supplied by the user. Create ONE full-body Funko Pop-style collectible vinyl figure of the SAME man in the photo: older bald man, short gray mustache, strong eyebrows, recognizable face proportions translated to an oversized rounded-square vinyl toy head and small body. Large simple black bead eyes, no caricature mockery. Preserve white long-sleeved shirt, light blue necktie, dark navy trousers and black shoes. Keep exact relaxed pose: one hand in trouser pocket, the other holding a dark jacket slung over his shoulder; watch on the wrist. Minimal clean illustration of the vinyl figurine with fine dark outlines, simple flat color regions, white and blue clothing, muted warm natural skin. No packaging, no base pedestal, no lettering, no logos, no new props. Full head and shoes entirely visible, tall portrait framing with small transparent safety padding. Genuine TRANSPARENT background, opaque figure. No hallway, no realistic photo background, no gradient, no glossy highlights, no glow or cast shadow, no checkerboard.",
+    "winter": "Edit target: the existing snowman illustration. Redraw it completely as a restrained minimalist illustration of an ORDINARY REAL-WORLD SNOWMAN, not a cute cartoon character. Exactly THREE separate round white snowballs stacked vertically: large bottom, medium torso, small head. Bare snow head, NO HAT and NO SCARF. Two very SMALL BLACK DOTS for coal eyes, small natural carrot nose, optional tiny dotted coal smile, two fine twig arms. NO big eyes, NO eye shine, NO eyebrows, NO open mouth, NO pink cheeks, no facial expression acting. Use fine cool-gray-blue contours, opaque white snow and at most one simple flat pale-blue shadow patch per ball. Minimal detail, no patterns, no accessories, no thick sticker border. Tall portrait isolated full snowman, near-tight crop with only 1-2 percent transparent margin at bottom and right, no part cut off. The complete subject stands on its largest snowball at bottom. True transparent background, opaque snowman. No scenery, base platform, gradients, glow, drop shadow, texture, text or checkerboard.",
+    "spring": "Edit target: existing dense flowering bush sticker. Replace it with a VERY SPARSE delicate flowering shrub drawn like a minimalist botanical line illustration. Three to five SLENDER brown upright twigs from one root, several fine branching side stems with large airy empty gaps. About 15-20 TINY five-petal pale pink flowers, each flower diameter about 1/30 of total shrub height, and only a few MINIATURE sage green leaves. The branches must be much more visible than flowers, absolutely no large thick green foliage and no oversized blossoms. Thin muted brown lines, soft flat pink petals, small darker pink centers, no thick outlines, no gradients, shading, blur or glow. Opaque lines and flowers on genuine transparent background. Tall portrait shrub subtly leaning right, full plant, base at bottom, nearly tight-cropped with 1-2 percent transparent margin on right and bottom. No pot, no mound of grass, no border, no text, no other objects, no checkerboard.",
+    "summer": "Edit target: the existing beach umbrella sticker. Redraw the SAME single beach umbrella as a MINIMALIST architectural-style line illustration. A plain slender muted brown pole with a simple open parasol canopy, four alternating muted golden-yellow and dusty coral-pink flat fabric panels. Fine outlines, no double contour, NO thick white border, no ornamental finial, no fabric texture. Few purposeful lines, no shiny highlights, no painted shading. Entire umbrella clearly recognizable with its original slight tilt. Flat solid colors only, no gradients, glow, blur or cast shadow. Genuine transparent background. Full isolated umbrella, portrait format tightly framed with about 1 percent transparent space at right and bottom. No sun, sand, chairs, people, text, badge or checkerboard.",
+    "autumn": "Edit target: autumn streetlamp illustration. Simplify it drastically into a quiet minimalist line-and-flat-color illustration. Keep ONE slim streetlamp at the right, a small curved hook and a simple lantern, a slim base. REMOVE EVERY LEAF, every vine, every decorative curl except the single plain hook. No leaves anywhere, including at the foot. Lantern has a small flat golden yellow fill and a faint sharply bounded flat pale cream-yellow triangular light beam extending toward bottom-left, with about 12 fine blue-gray diagonal rain strokes visible inside. Thin charcoal brown outlines instead of chunky sticker lines. NO glow, NO blurred halos, NO gradient fill, NO rendered lighting, NO shading; flat solid shapes and delicate linework only. Entire isolated lamp from top to foot and narrow cone visible, genuinely transparent background outside flat shapes. Tall portrait near-tight framing with 1-2 percent transparent padding on right and bottom, foot almost at bottom right. No scenery, floor, text, border or checkerboard.",
+    "magic": "Edit target: existing red standing broom sticker. Preserve the exact entire broom silhouette and its leaning pose, bristles bottom-left and handle at upper-right, but redraw with MUCH THINNER contours matching a delicate botanical line illustration. Single fine charcoal-black contour line of consistent weight around red parts, about one quarter of existing contour thickness. Remove all white glossy highlights, remove glow and every shadow. Use muted deep red flat opaque fills for shaft and bristles with just three fine internal bristle lines. Minimal details, no thick ring band. Full broom isolated on a true transparent background, tall portrait near-tight crop with 1 percent transparent padding at right and bottom. No figure, no new objects, no gradients, no text, no border or checkerboard.",
+    "hello-kitty": "Use case: illustration-story. Website decorative corner asset: ONE full-body Hello Kitty character, recognizable official-style simple white cat character with NO MOUTH, black oval dot eyes and small yellow oval nose, three short whiskers on each cheek, pink bow beside her left ear, pale pink dress and tiny rounded shoes. Minimal flat Sanrio-like line art, delicate consistent dark charcoal outlines matching quiet thin-line website seasonal illustrations, opaque white face and body, flat soft rose and pink fills, no shading or gradients. Standing calmly, full ears, bow and feet visible; no extra props, no text, no border, no glow or drop shadow. Isolated on a genuine transparent background. Portrait near-tight framing with a small transparent safety margin. No scenery, no flowers, no sparkles or checkerboard.",
+    "robo548": "Use case: illustration-story. ONE isolated Arduino Nano CLASSIC microcontroller board as a minimalist website bottom-right corner illustration, not Arduino Uno, not Nano ESP32. Recognizable narrow BLUE rectangular PCB, two parallel rows of 15 metallic/golden header pins along the long sides, silver mini-USB socket at the top short end, black square ATmega328P chip in the center, a few small silver components and subtle white pin markings. Show the whole board in a very gentle three-quarter top view with the long axis vertical and a slight lean to the right. Restrained crisp thin charcoal outlines, solid blue, black and silver colors, no glossy 3D rendering, no cartoon face. Full board and every pin visible, tall portrait tight framing with a little transparent safety margin. Genuine transparent background, opaque hardware. No wires, breadboard, hands, scenery, logos or large lettering, no gradients, glow, shadow, border or checkerboard."
+  },
+  "reference": {
+    "minions": "User-provided photo_2026-11-24_08-54-32.jpg",
+    "67": "Generated thin-outline predecessor of 67.png; eye-only edit.",
+    "548": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAA5kFe5twkDvWm07ZUv46kbRGZyCEKEG_xo_EXFH8ag&s=10",
+    "winter": "Previous winter.png",
+    "spring": "Previous spring.png",
+    "summer": "Previous summer.png",
+    "autumn": "Previous autumn.png",
+    "magic": "Previous magic.png"
+  },
+  "usage": "Minimalist opaque illustrations on screens at least 1360px wide. Winter, summer and autumn are shifted left without changing vertical placement; spring is mirrored horizontally. Some illustrations remain tucked behind the edges. The magic broom is not clipped and leaves a 2px gap from the right and bottom edges (or article navigation). CSS maps the recorded source pixel bounds onto the display box without stretching.",
+  "crop": {
+    "minions": {
+      "source": [736, 736],
+      "bounds": [65, 12, 622, 707]
+    },
+    "67": {
+      "source": [
+        1024,
+        1536
+      ],
+      "bounds": [
+        103,
+        27,
+        758,
+        1446
+      ]
+    },
+    "548": {
+      "source": [
+        1024,
+        1536
+      ],
+      "bounds": [
+        159,
+        26,
+        678,
+        1497
+      ]
+    },
+    "winter": {
+      "source": [
+        1173,
+        1341
+      ],
+      "bounds": [
+        152,
+        157,
+        842,
+        1176
+      ]
+    },
+    "spring": {
+      "source": [
+        1215,
+        1295
+      ],
+      "bounds": [
+        128,
+        32,
+        980,
+        1241
+      ]
+    },
+    "summer": {
+      "source": [
+        1215,
+        1295
+      ],
+      "bounds": [
+        39,
+        126,
+        1108,
+        1126
+      ]
+    },
+    "autumn": {
+      "source": [
+        1024,
+        1536
+      ],
+      "bounds": [
+        21,
+        37,
+        820,
+        1466
+      ]
+    },
+    "magic": {
+      "source": [
+        1024,
+        1536
+      ],
+      "bounds": [
+        188,
+        48,
+        705,
+        1460
+      ]
+    },
+    "hello-kitty": {
+      "source": [
+        1145,
+        1374
+      ],
+      "bounds": [
+        71,
+        45,
+        1004,
+        1310
+      ]
+    },
+    "robo548": {
+      "source": [
+        1024,
+        1536
+      ],
+      "bounds": [
+        139,
+        89,
+        744,
+        1399
+      ]
+    }
+  }
+}

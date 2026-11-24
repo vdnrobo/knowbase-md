@@ -1,0 +1,160 @@
+/* These selectors override light theme tokens while preserving their assets. */
+:root[data-theme][data-color-mode="dark"] {
+    color-scheme: dark;
+    --page-bg: #101216;
+    --surface: #191c22;
+    --surface-soft: #232936;
+    --surface-muted: #15181e;
+    --text: #e1e5ef;
+    --heading: #f5f7ff;
+    --muted: #acb5c8;
+    --accent: #a2b7ff;
+    --accent-dark: #cad6ff;
+    --accent-soft: #293650;
+    --link-color: #a2c3ff;
+    --border: #3a455a;
+    --border-strong: #6c7c99;
+    --shadow: rgba(0, 0, 0, .3);
+    --danger: #ffb4a4;
+    --success: #8ed6a5;
+    --on-accent: #14171d;
+    --nav-bg: rgba(25, 28, 34, .96);
+    --code-bg: #0d111c;
+    --code-text: #f1f4fc;
+    --ui-icon-filter: invert(.9);
+    --theme-pattern-filter: invert(1) hue-rotate(180deg);
+}
+
+:root[data-theme="winter"][data-color-mode="dark"] {
+    --page-bg: #10171d;
+    --surface: #18232b;
+    --surface-soft: #20313e;
+    --surface-muted: #142029;
+    --accent: #8fcdf1;
+    --accent-dark: #c4e8ff;
+    --accent-soft: #244256;
+    --link-color: #99d6ff;
+    --border: #355063;
+    --border-strong: #6187a0;
+    --nav-bg: rgba(24, 35, 43, .96);
+}
+
+:root[data-theme="spring"][data-color-mode="dark"],
+:root[data-theme="hello-kitty"][data-color-mode="dark"] {
+    --page-bg: #1b1319;
+    --surface: #281d25;
+    --surface-soft: #352433;
+    --surface-muted: #221820;
+    --accent: #f1a3c8;
+    --accent-dark: #ffd0e6;
+    --accent-soft: #4b2b40;
+    --link-color: #ffb2d8;
+    --border: #594050;
+    --border-strong: #977088;
+    --nav-bg: rgba(40, 29, 37, .96);
+}
+
+:root[data-theme="hello-kitty"][data-color-mode="dark"] {
+    --accent: #ff9fd1;
+    --accent-dark: #ffd0ec;
+    --accent-soft: #512b45;
+    --link-color: #ffb4df;
+}
+
+:root[data-theme="summer"][data-color-mode="dark"] {
+    --page-bg: #191711;
+    --surface: #25231b;
+    --surface-soft: #333023;
+    --surface-muted: #201e17;
+    --accent: #efd17c;
+    --accent-dark: #ffe8a6;
+    --accent-soft: #484024;
+    --link-color: #f8d984;
+    --border: #544b32;
+    --border-strong: #91805a;
+    --nav-bg: rgba(37, 35, 27, .96);
+}
+
+:root[data-theme="autumn"][data-color-mode="dark"],
+:root[data-theme="548"][data-color-mode="dark"] {
+    --page-bg: #1c1511;
+    --surface: #2a201b;
+    --surface-soft: #382a21;
+    --surface-muted: #231a15;
+    --accent: #f7b17e;
+    --accent-dark: #ffd4b3;
+    --accent-soft: #4c3324;
+    --link-color: #ffc093;
+    --border: #5b4434;
+    --border-strong: #967357;
+    --nav-bg: rgba(42, 32, 27, .96);
+}
+
+:root[data-theme="548"][data-color-mode="dark"] {
+    --accent: #ffac70;
+    --accent-dark: #ffd2ad;
+    --accent-soft: #513222;
+    --link-color: #ffbd89;
+}
+
+:root[data-theme="67"][data-color-mode="dark"] {
+    --surface-soft: #222d3a;
+    --accent: #91bfff;
+    --accent-dark: #c6ddff;
+    --accent-soft: #283c59;
+    --link-color: #a6ceff;
+    --border: #3b4b62;
+    --border-strong: #6b84a5;
+}
+
+:root[data-theme="magic"][data-color-mode="dark"] {
+    --page-bg: #111111;
+    --surface: #1c1c1c;
+    --surface-soft: #2b2224;
+    --surface-muted: #171717;
+    --text: #e9e5e5;
+    --heading: #fffafa;
+    --muted: #bfb3b5;
+    --accent: #ff929d;
+    --accent-dark: #ffc6cc;
+    --accent-soft: #47262c;
+    --link-color: #ffabb5;
+    --border: #514044;
+    --border-strong: #8d6a71;
+    --code-bg: #101010;
+    --nav-bg: rgba(28, 28, 28, .96);
+}
+
+:root[data-theme="robo548"][data-color-mode="dark"] {
+    --page-bg: #11161b;
+    --surface: #1a242d;
+    --surface-soft: #22333f;
+    --surface-muted: #162029;
+    --accent: #8fc5f5;
+    --accent-dark: #c4e3ff;
+    --accent-soft: #29435b;
+    --link-color: #9ed5ff;
+    --border: #3c5469;
+    --border-strong: #6c8ca6;
+    --nav-bg: rgba(26, 36, 45, .96);
+}
+
+:root[data-theme="minions"][data-color-mode="dark"] {
+    --page-bg: #191811;
+    --surface: #25241a;
+    --surface-soft: #333020;
+    --surface-muted: #201e16;
+    --accent: #f3d36a;
+    --accent-dark: #ffe6a0;
+    --accent-soft: #484022;
+    --link-color: #a2d8ff;
+    --border: #5a5131;
+    --border-strong: #948454;
+    --nav-bg: rgba(37, 36, 26, .96);
+    --theme-pattern-filter: none;
+}
+
+html[data-color-mode="dark"] :is(.reader-icon-button, .utility-icon-link) img,
+html[data-color-mode="dark"] .ui-icon {
+    filter: var(--ui-icon-filter);
+}
